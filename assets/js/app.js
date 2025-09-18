@@ -715,6 +715,105 @@ function boot(){
   // Initial visibility
   updateViewVisibility();
 
+  // --- Whiteboard UI wiring ---
+  function generateBoardCode() {
+    // Simple human-friendly 6-char code (A-Z0-9)
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let out = '';
+    for (let i = 0; i < 6; i++) out += chars.charAt(Math.floor(Math.random() * chars.length));
+    return out;
+  }
+
+  function setWhiteboardUIFor(boardId) {
+    const title = $('#whiteboardTitle');
+    const codeEl = $('#whiteboardCode');
+    const shareBtn = $('#whiteboardShareBtn');
+    const leaveBtn = $('#whiteboardLeaveBtn');
+    if (boardId) {
+      if (title) title.textContent = 'Board — ' + boardId;
+      if (codeEl) codeEl.textContent = boardId;
+      if (shareBtn) shareBtn.disabled = false;
+      if (leaveBtn) leaveBtn.disabled = false;
+    } else {
+      if (title) title.textContent = 'Select a whiteboard';
+      if (codeEl) codeEl.textContent = '';
+      if (shareBtn) shareBtn.disabled = true;
+      if (leaveBtn) leaveBtn.disabled = true;
+    }
+  }
+
+  // Keep a simple in-memory list of boards for this demo (persisted per-session)
+  let _wbList = JSON.parse(sessionStorage.getItem('studyflow:whiteboards') || '[]');
+  function saveWbList() { try { sessionStorage.setItem('studyflow:whiteboards', JSON.stringify(_wbList)); } catch(_){} }
+
+  function renderWhiteboardList() {
+    const list = $('#whiteboardList');
+    if (!list) return;
+    list.innerHTML = '';
+    _wbList.forEach(code => {
+      const btn = document.createElement('button');
+      btn.className = 'wb-item';
+      btn.textContent = code;
+      btn.onclick = () => {
+        try { if (window.Whiteboard && typeof window.Whiteboard.join === 'function') { window.Whiteboard.join(code); setWhiteboardUIFor(code); } } catch(e){}
+      };
+      list.appendChild(btn);
+    });
+  }
+
+  // New board
+  const createBtn = $('#createWhiteboardBtn');
+  if (createBtn) createBtn.onclick = () => {
+    // Require sign-in to create board (consistent with app's data rules)
+    if (!DB.user) { requestSignIn(); return; }
+    const code = generateBoardCode();
+    // Add to list and persist
+    if (!_wbList.includes(code)) { _wbList.unshift(code); if (_wbList.length > 20) _wbList.length = 20; saveWbList(); }
+    renderWhiteboardList();
+    try { if (window.Whiteboard && typeof window.Whiteboard.join === 'function') { window.Whiteboard.join(code); setWhiteboardUIFor(code); showToast('Created and joined board ' + code, 2500); } } catch(e){ console.warn('Failed to join new whiteboard', e); }
+  };
+
+  // Join by code
+  const joinInput = $('#whiteboardJoinInput');
+  const joinBtn = $('#joinWhiteboardBtn');
+  if (joinBtn && joinInput) joinBtn.onclick = () => {
+    const code = (joinInput.value || '').trim().toUpperCase();
+    if (!code) { showToast('Enter a board code to join', 2000); return; }
+    if (!DB.user) { requestSignIn(); return; }
+    if (!_wbList.includes(code)) { _wbList.unshift(code); saveWbList(); renderWhiteboardList(); }
+    try { window.Whiteboard.join(code); setWhiteboardUIFor(code); showToast('Joined board ' + code, 2000); } catch(e){ console.warn('Join failed', e); }
+  };
+
+  // Leave
+  const leaveBtn = $('#whiteboardLeaveBtn');
+  if (leaveBtn) leaveBtn.onclick = () => {
+    try { window.Whiteboard.leave(); setWhiteboardUIFor(null); showToast('Left whiteboard', 1500); } catch(e){ console.warn('Leave failed', e); }
+  };
+
+  // Clear board (clears remote cursors overlay only for now)
+  const clearBtn = $('#whiteboardClearBtn');
+  if (clearBtn) clearBtn.onclick = () => {
+    try {
+      // There is no explicit 'clear canvas' API in the whiteboard module; simulate by leaving and re-joining which clears remotes
+      const cur = (window.Whiteboard && typeof window.Whiteboard.getCurrentBoard === 'function') ? window.Whiteboard.getCurrentBoard() : null;
+      if (!cur) { showToast('No board selected', 1500); return; }
+      // Quick approach: leave then rejoin to reset overlay state
+      window.Whiteboard.leave();
+      setTimeout(()=>{ try{ window.Whiteboard.join(cur); setWhiteboardUIFor(cur); showToast('Cleared board', 1500); }catch(e){ console.warn(e); } }, 50);
+    } catch(e){ console.warn('Clear failed', e); }
+  };
+
+  // Share (copy code to clipboard)
+  const shareBtn = $('#whiteboardShareBtn');
+  if (shareBtn) shareBtn.onclick = async () => {
+    const cur = (window.Whiteboard && typeof window.Whiteboard.getCurrentBoard === 'function') ? window.Whiteboard.getCurrentBoard() : null;
+    if (!cur) { showToast('No board selected', 1500); return; }
+    try { await navigator.clipboard.writeText(cur); showToast('Board code copied', 1500); } catch(e){ showToast('Copy failed', 1500); }
+  };
+
+  // Wire up initial list
+  renderWhiteboardList();
+
   // Update auth UI based on user object (Firebase user or null)
   function updateAuthUI(user){
     const signedOut = $('#signedOutControls');
