@@ -713,7 +713,7 @@ function boot(){
   // Topbar email/password removed: only Google sign-in present in the splash
 
   // Initial visibility
-  const toggle = #viewToggle;\r\n  if(toggle){\r\n    toggle.style.display = (page==='home' || page==='calendar') ? 'flex' : 'none';\r\n  }\r\n  updateViewVisibility();
+  updateViewVisibility();
 
   // Update auth UI based on user object (Firebase user or null)
   function updateAuthUI(user){
@@ -761,6 +761,7 @@ function boot(){
 }
 
 document.addEventListener('DOMContentLoaded', boot);
+
 
 
 
