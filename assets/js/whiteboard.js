@@ -721,10 +721,6 @@
       });
     },
 
-    },
-    },
-    },
-
     applyBoardSnapshot(snap){
       if(!snap.exists()){
         showToast('Whiteboard removed by owner.');
@@ -1003,6 +999,7 @@
     Whiteboard.init();
   }
 })();
+
 
 
 
