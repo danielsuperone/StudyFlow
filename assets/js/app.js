@@ -716,6 +716,26 @@ function boot(){
   updateViewVisibility();
 
   // --- Whiteboard UI wiring ---
+  // Registry: track active boards announced by owners (via BroadcastChannel)
+  const REGISTRY_CH = 'whiteboard:registry';
+  const registry = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel(REGISTRY_CH) : null;
+  const activeBoards = new Map(); // code -> { ownerId, lastTs }
+  const ACTIVE_TTL_MS = 7000;
+  function isBoardActive(code){ const e = activeBoards.get(code); return !!(e && (Date.now() - e.lastTs) <= ACTIVE_TTL_MS); }
+  if(registry){
+    registry.onmessage = (ev)=>{
+      const msg = ev && ev.data || ev; if(!msg || !msg.boardId) return;
+      if(msg.type==='create' || msg.type==='heartbeat'){
+        activeBoards.set(msg.boardId, { ownerId: msg.ownerId, lastTs: msg.ts||Date.now() });
+      } else if(msg.type==='destroy'){
+        activeBoards.delete(msg.boardId);
+      }
+    };
+  }
+
+  // Identity used by whiteboard networking (matches whiteboard.js selection)
+  const myId = (DB.user && DB.user.uid) || (window.Whiteboard && typeof window.Whiteboard.getClientId==='function' ? window.Whiteboard.getClientId() : null) || 'anon';
+
   function generateBoardCode() {
     // Simple human-friendly 6-char code (A-Z0-9)
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -729,16 +749,19 @@ function boot(){
     const codeEl = $('#whiteboardCode');
     const shareBtn = $('#whiteboardShareBtn');
     const leaveBtn = $('#whiteboardLeaveBtn');
+    currentBoard = boardId || null;
     if (boardId) {
       if (title) title.textContent = 'Board — ' + boardId;
       if (codeEl) codeEl.textContent = boardId;
       if (shareBtn) shareBtn.disabled = false;
       if (leaveBtn) leaveBtn.disabled = false;
+      attachBoardChannel(boardId);
     } else {
       if (title) title.textContent = 'Select a whiteboard';
       if (codeEl) codeEl.textContent = '';
       if (shareBtn) shareBtn.disabled = true;
       if (leaveBtn) leaveBtn.disabled = true;
+      detachBoardChannel();
     }
   }
 
@@ -770,7 +793,18 @@ function boot(){
     // Add to list and persist
     if (!_wbList.includes(code)) { _wbList.unshift(code); if (_wbList.length > 20) _wbList.length = 20; saveWbList(); }
     renderWhiteboardList();
-    try { if (window.Whiteboard && typeof window.Whiteboard.join === 'function') { window.Whiteboard.join(code); setWhiteboardUIFor(code); showToast('Created and joined board ' + code, 2500); } } catch(e){ console.warn('Failed to join new whiteboard', e); }
+    try {
+      // Announce ownership and start heartbeat
+      markAsOwner(code);
+      if (window.Whiteboard && typeof window.Whiteboard.join === 'function') {
+        window.Whiteboard.join(code);
+        setWhiteboardUIFor(code);
+        // Add self to participants immediately (UI)
+        upsertParticipant({ userId: myId, name: (DB.user && (DB.user.displayName||DB.user.email)) || 'You', color: '#2563eb', idle: false });
+        renderParticipants();
+        showToast('Created and joined board ' + code, 2500);
+      }
+    } catch(e){ console.warn('Failed to join new whiteboard', e); }
   };
 
   // Join by code
@@ -780,14 +814,33 @@ function boot(){
     const code = (joinInput.value || '').trim().toUpperCase();
     if (!code) { showToast('Enter a board code to join', 2000); return; }
     if (!DB.user) { requestSignIn(); return; }
+    const active = isBoardActive(code) || ownerBoards.has(code);
+    if (!active) { showToast('Board is not active (no owner). Ask the owner to open it first.', 3500); return; }
     if (!_wbList.includes(code)) { _wbList.unshift(code); saveWbList(); renderWhiteboardList(); }
-    try { window.Whiteboard.join(code); setWhiteboardUIFor(code); showToast('Joined board ' + code, 2000); } catch(e){ console.warn('Join failed', e); }
+    try {
+      window.Whiteboard.join(code);
+      setWhiteboardUIFor(code);
+      // Add self to participants immediately (UI)
+      upsertParticipant({ userId: myId, name: (DB.user && (DB.user.displayName||DB.user.email)) || 'You', color: '#2563eb', idle: false });
+      renderParticipants();
+      showToast('Joined board ' + code, 2000);
+    } catch(e){ console.warn('Join failed', e); }
   };
 
   // Leave
   const leaveBtn = $('#whiteboardLeaveBtn');
   if (leaveBtn) leaveBtn.onclick = () => {
-    try { window.Whiteboard.leave(); setWhiteboardUIFor(null); showToast('Left whiteboard', 1500); } catch(e){ console.warn('Leave failed', e); }
+    try {
+      const cur = currentBoard;
+      if (!cur) { showToast('No board selected', 1500); return; }
+      // If I am the owner of this board, announce destroy and stop heartbeat
+      if (ownerBoards.has(cur)) {
+        stopHeartbeat(cur, true);
+      }
+      window.Whiteboard.leave();
+      setWhiteboardUIFor(null);
+      showToast('Left whiteboard', 1500);
+    } catch(e){ console.warn('Leave failed', e); }
   };
 
   // Clear board (clears remote cursors overlay only for now)
@@ -813,6 +866,97 @@ function boot(){
 
   // Wire up initial list
   renderWhiteboardList();
+
+  // --- Ownership/Participants helpers ---
+  const ownerBoards = new Set(); // codes I own
+  const heartbeats = new Map(); // code -> intervalId
+  let currentBoard = null; // currently joined code
+  let boardChannel = null; // BroadcastChannel for current board traffic
+  const participants = new Map(); // userId -> {userId, name, color, idle, lastUpdate}
+
+  function markAsOwner(code){
+    ownerBoards.add(code);
+    // announce create and start heartbeat
+    const announce = (type)=>{ if(!registry) return; try{ registry.postMessage({ type, boardId: code, ownerId: myId, ts: Date.now() }); }catch(_){} };
+    announce('create');
+    if(!heartbeats.has(code)){
+      const id = setInterval(()=> announce('heartbeat'), 2000);
+      heartbeats.set(code, id);
+    }
+  }
+
+  function stopHeartbeat(code, announceDestroy=false){
+    const id = heartbeats.get(code); if(id){ clearInterval(id); heartbeats.delete(code); }
+    ownerBoards.delete(code);
+    if(announceDestroy && registry){ try{ registry.postMessage({ type:'destroy', boardId: code, ownerId: myId, ts: Date.now() }); }catch(_){} }
+  }
+
+  function attachBoardChannel(code){
+    detachBoardChannel();
+    if(typeof BroadcastChannel === 'undefined') return;
+    boardChannel = new BroadcastChannel('whiteboard:' + code);
+    boardChannel.onmessage = (ev)=>{ handleBoardMessage(ev && ev.data || ev); };
+    participants.clear();
+    renderParticipants();
+  }
+
+  function detachBoardChannel(){
+    if(boardChannel){ try{ boardChannel.close(); }catch(_){} boardChannel = null; }
+    participants.clear();
+    renderParticipants();
+  }
+
+  function upsertParticipant(p){
+    if(!p || !p.userId) return; const r = participants.get(p.userId) || { userId: p.userId };
+    if(p.name) r.name = p.name; if(p.color) r.color = p.color; if(typeof p.idle==='boolean') r.idle = p.idle;
+    r.lastUpdate = Date.now(); participants.set(p.userId, r);
+  }
+
+  function handleBoardMessage(msg){
+    if(!msg || msg.boardId !== currentBoard) return;
+    if(msg.type === 'presence'){
+      const p = msg.payload || {}; const uid = p.userId; if(!uid) return;
+      if(p.action === 'leave') { participants.delete(uid); }
+      else if(p.action === 'idle') { upsertParticipant({ userId: uid, name: p.name, color: p.color, idle: true }); }
+      else { upsertParticipant({ userId: uid, name: p.name, color: p.color, idle: false }); }
+      renderParticipants();
+    } else if(msg.type === 'control'){
+      const c = msg.payload || {};
+      if(c.action === 'kick' && c.targetUserId === myId){
+        try{ window.Whiteboard.leave(); }catch(_){}
+        setWhiteboardUIFor(null);
+        showToast('You were removed by the owner', 2500);
+      }
+    }
+  }
+
+  function renderParticipants(){
+    const container = $('#whiteboardParticipants'); if(!container) return;
+    container.innerHTML = '';
+    if(!currentBoard) return;
+    const iAmOwner = ownerBoards.has(currentBoard);
+    participants.forEach((rec)=>{
+      const row = document.createElement('div'); row.className = 'wb-participant';
+      const name = document.createElement('span'); name.textContent = (rec.name || (rec.userId||'user').slice(-6)); row.appendChild(name);
+      if(iAmOwner && rec.userId !== myId){
+        const btn = document.createElement('button'); btn.className = 'btn ghost'; btn.textContent = 'Remove';
+        btn.onclick = ()=>{
+          try{ if(boardChannel){ boardChannel.postMessage({ boardId: currentBoard, senderId: myId, type: 'control', payload: { action:'kick', targetUserId: rec.userId, requestedBy: myId, ts: Date.now() } }); } }catch(_){}
+        };
+        row.appendChild(btn);
+      }
+      container.appendChild(row);
+    });
+  }
+
+  // Clean up on unload (owners announce destroy)
+  window.addEventListener('beforeunload', ()=>{
+    try{
+      if(currentBoard && ownerBoards.has(currentBoard)){
+        stopHeartbeat(currentBoard, true);
+      }
+    }catch(_){}
+  });
 
   // Update auth UI based on user object (Firebase user or null)
   function updateAuthUI(user){
