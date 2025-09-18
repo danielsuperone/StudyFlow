@@ -151,6 +151,7 @@ input, select{ width:100%; padding:10px; border-radius:10px; border:1px solid va
 .whiteboard-main-header{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap}
 .whiteboard-main-header h2{margin:0}
 .whiteboard-meta{color:var(--muted);font-size:13px;margin-top:4px}
+.whiteboard-meta .wb-members{display:inline-flex;align-items:center;gap:6px;margin-left:6px;padding:4px 8px;border-radius:999px;background:rgba(98,195,158,0.18);color:var(--text);font-weight:700}
 .whiteboard-main-actions{display:flex;gap:8px;flex-wrap:wrap}
 .whiteboard-info-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 16px;border:1px dashed var(--border);border-radius:14px;background:rgba(255,255,255,0.7)}
 .whiteboard-code{font-weight:700;text-transform:uppercase;letter-spacing:3px;color:var(--accent)}

@@ -651,9 +651,12 @@
       this.brushRadius = options.brushRadius || 6;
       this.clientId = options.clientId || createUid('client');
       this.throttleMs = options.throttleMs || 40;
+      this.strokeThrottleMs = options.strokeThrottleMs || 25;
       this.idleMs = options.idleMs || 5000;
       this.onCursor = options.onCursor;
       this.onPresence = options.onPresence;
+  this.onStroke = options.onStroke;
+  this.onControl = options.onControl;
       this.transport = options.transport || createDefaultTransport(`whiteboard:${this.boardId}`);
       this.disposed = false;
       this.isIdle = false;
@@ -666,6 +669,9 @@
           payload
         });
       }, this.throttleMs, options.throttleOptions);
+      this.strokeSender = createThrottledSender((payload) => {
+        this.send({ type: 'stroke', payload });
+      }, this.strokeThrottleMs, options.throttleOptions);
       this.sendPresence('join');
       this.scheduleIdleCheck();
     }
@@ -697,6 +703,16 @@
         const payload = message.payload || {};
         if (typeof this.onCursor === 'function') {
           this.onCursor(Object.assign({}, payload));
+        }
+      } else if (message.type === 'stroke') {
+        const payload = message.payload || {};
+        if (typeof this.onStroke === 'function') {
+          this.onStroke(Object.assign({}, payload));
+        }
+      } else if (message.type === 'control') {
+        const payload = message.payload || {};
+        if (typeof this.onControl === 'function') {
+          this.onControl(Object.assign({}, payload));
         }
       } else if (message.type === 'presence') {
         if (typeof this.onPresence === 'function') {
@@ -730,6 +746,17 @@
     flush() {
       if (this.disposed) return;
       this.sender(undefined, true);
+    }
+    sendStroke(segment) {
+      if (this.disposed) return;
+      if (!segment) return;
+      this.strokeSender(segment);
+    }
+    sendStrokeBatch(segments){
+      if (this.disposed) return;
+      if (!Array.isArray(segments) || !segments.length) return;
+      // bypass throttle to send as one packet
+      this.send({ type: 'stroke', payload: segments });
     }
 
     scheduleIdleCheck() {
@@ -817,7 +844,17 @@
     brush: { radius: 6, color: '#2e2e2e' },
     tool: 'pen', // 'pen' | 'highlighter' | 'eraser'
     lastPointerMove: 0,
-    identity: null
+    identity: null,
+    // Batching for network and DB
+    strokeBatch: [],
+    strokeBatchTimer: null,
+    strokeBatchIntervalMs: 30,
+    // Firebase persistence
+    dbRef: null,
+    dbUnsubscribe: null,
+    dbBatch: [],
+    dbFlushTimer: null,
+    dbFlushIntervalMs: 140
   };
 
   function getOrCreateClientId() {
@@ -990,6 +1027,9 @@
       state.networking.flush();
       state.networking.pokeIdle();
     }
+    // persist any remaining batch promptly
+    if (state.dbFlushTimer) { clearTimeout(state.dbFlushTimer); state.dbFlushTimer = null; }
+    flushDbBatch();
   }
 
   function handlePointerLeave() {
@@ -1039,12 +1079,46 @@
     ctx.closePath();
     ctx.restore();
     state.lastCanvasPoint = p;
+
+    // Broadcast stroke segment to others
+    if (state.networking) {
+      const payload = {
+        x1: prev.x, y1: prev.y,
+        x2: p.x, y2: p.y,
+        color: state.brush.color,
+        width: tool === 'eraser' ? Math.max(2, state.brush.radius * 2)
+              : tool === 'highlighter' ? Math.max(2, state.brush.radius * 1.6)
+              : Math.max(1, state.brush.radius),
+        alpha: tool === 'highlighter' ? 0.35 : (tool === 'eraser' ? 1 : 1),
+        op: tool === 'eraser' ? 'destination-out' : 'source-over',
+        tool
+      };
+      // Queue locally for batched network send and DB persistence
+      queueStrokeSegment(payload);
+    }
   }
 
   function clearCanvas() {
     if (state.ctx && state.canvasEl) {
       state.ctx.clearRect(0, 0, state.canvasEl.width, state.canvasEl.height);
     }
+  }
+
+  function broadcastClear(){
+    if (state.networking) {
+      state.networking.send({ type: 'control', payload: { action: 'clear', ts: Date.now() } });
+    }
+  }
+
+  async function clearPersisted(){
+    // Remove persisted strokes for current board from Firebase if available
+    if (!state.boardId) return;
+    try{
+      if (!isFirebaseDbAvailable()) return;
+      const db = getDb(); if (!db) return;
+      const base = window.firebase.ref(db, `whiteboards/${state.boardId}/strokes`);
+      await window.firebase.remove(base);
+    }catch(_){ /* ignore */ }
   }
 
   function setTool(tool) {
@@ -1089,6 +1163,140 @@
       state.overlay.updateRemoteMeta(payload.userId, Object.assign({}, payload, { idle: true }));
     }
   }
+
+  function handleRemoteStroke(payload) {
+    if (!payload || !state.ctx) return;
+    // Support single or batch payloads
+    const drawOne = (seg) => {
+      if (!seg) return;
+      const ctx = state.ctx;
+      ctx.save();
+      ctx.globalCompositeOperation = seg.op || 'source-over';
+      ctx.strokeStyle = seg.color || '#2e2e2e';
+      ctx.lineWidth = Math.max(1, Number(seg.width) || 2);
+      ctx.globalAlpha = typeof seg.alpha === 'number' ? seg.alpha : 1;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(seg.x1, seg.y1);
+      ctx.lineTo(seg.x2, seg.y2);
+      ctx.stroke();
+      ctx.closePath();
+      ctx.restore();
+    };
+    if (Array.isArray(payload)) {
+      for (const seg of payload) drawOne(seg);
+    } else {
+      drawOne(payload);
+    }
+  }
+
+  function handleControlMessage(payload){
+    if (!payload) return;
+    if (payload.action === 'clear') {
+      clearCanvas();
+    }
+  }
+
+  // ---------- Stroke batching & Firebase persistence ----------
+  function queueStrokeSegment(seg){
+    // For network: batch into short interval packet
+    state.strokeBatch.push(seg);
+    if (!state.strokeBatchTimer) {
+      state.strokeBatchTimer = setTimeout(()=>{
+        const batch = state.strokeBatch.splice(0, state.strokeBatch.length);
+        state.strokeBatchTimer = null;
+        if (state.networking) {
+          if (batch.length === 1) state.networking.sendStroke(batch[0]);
+          else state.networking.sendStrokeBatch(batch);
+        }
+      }, state.strokeBatchIntervalMs);
+    }
+    // For DB persistence: coalesce into slightly larger batches
+    state.dbBatch.push(seg);
+    if (!state.dbFlushTimer) {
+      state.dbFlushTimer = setTimeout(()=>{
+        state.dbFlushTimer = null;
+        flushDbBatch();
+      }, state.dbFlushIntervalMs);
+    }
+  }
+
+  function isFirebaseDbAvailable(){
+    try{
+      if (!isBrowser) return false;
+      const fb = window.firebase;
+      if (!fb || typeof fb.getDatabase !== 'function' || !fb._app) return false;
+      const hasUrl = fb._app && fb._app.options && fb._app.options.databaseURL;
+      return !!hasUrl;
+    }catch(_){ return false; }
+  }
+
+  function getDb(){
+    try{ return window.firebase.getDatabase(window.firebase._app); }catch(_){ return null; }
+  }
+
+  function attachFirebaseStrokeStream(boardId){
+    if (!isFirebaseDbAvailable()) return;
+    const db = getDb(); if (!db) return;
+    // Detach any prior
+    detachFirebaseStrokeStream();
+    const base = window.firebase.ref(db, `whiteboards/${boardId}/strokes`);
+    state.dbRef = base;
+    const hasBC = (typeof BroadcastChannel === 'function');
+    // Load history first (one-time)
+    try{
+      window.firebase.get(base).then((snap)=>{
+        try{
+          const data = snap && typeof snap.forEach === 'function' ? snap : null;
+          if (data){
+            const segsAll = [];
+            data.forEach((child)=>{
+              try{
+                const val = child && child.val ? child.val() : null;
+                if (!val || (val.senderId && val.senderId === state.clientId)) return;
+                if (Array.isArray(val.segments)) segsAll.push(...val.segments);
+              }catch(_){ }
+            });
+            if (segsAll.length) handleRemoteStroke(segsAll);
+          }
+        }catch(_){ }
+      });
+    }catch(_){ }
+    // If BroadcastChannel exists, rely on it for live; otherwise subscribe to DB live
+    if (!hasBC){
+      state.dbUnsubscribe = window.firebase.onChildAdded(base, (snap)=>{
+        try{
+          const val = snap && typeof snap.val === 'function' ? snap.val() : (snap && snap.val) ? snap.val : null;
+          if (!val) return;
+          if (val.senderId && val.senderId === state.clientId) return;
+          const segs = Array.isArray(val.segments) ? val.segments : [];
+          if (segs.length) handleRemoteStroke(segs);
+        }catch(e){ /* ignore draw errors */ }
+      });
+    }
+  }
+
+  function detachFirebaseStrokeStream(){
+    try{
+      if (state.dbUnsubscribe) { state.dbUnsubscribe(); state.dbUnsubscribe = null; }
+      if (state.dbRef) { window.firebase.off(state.dbRef); state.dbRef = null; }
+    }catch(_){ /* noop */ }
+  }
+
+  async function flushDbBatch(){
+    if (!state.dbBatch.length) return;
+    if (!isFirebaseDbAvailable() || !state.boardId) { state.dbBatch.length = 0; return; }
+    const db = getDb(); if (!db) { state.dbBatch.length = 0; return; }
+    const base = state.dbRef || window.firebase.ref(db, `whiteboards/${state.boardId}/strokes`);
+    const payload = { senderId: state.clientId, ts: Date.now(), segments: state.dbBatch.splice(0, state.dbBatch.length) };
+    try {
+      const node = window.firebase.push(base);
+      await window.firebase.set(node, payload);
+    } catch (e) {
+      // If write fails (offline/unconfigured), drop batch silently
+    }
+  }
   function joinBoard(boardId, options = {}) {
     init();
     const identifier = options.userId || (state.user && state.user.uid) || state.clientId;
@@ -1103,6 +1311,8 @@
       state.networking.destroy();
       state.networking = null;
     }
+    // Detach any Firebase listeners from prior board
+    detachFirebaseStrokeStream();
     if (!boardId) {
       state.boardId = null;
       if (state.overlay) state.overlay.clearRemotes();
@@ -1118,8 +1328,12 @@
       brushRadius: state.brush.radius,
       clientId: state.clientId,
       onCursor: handleRemoteCursor,
-      onPresence: handlePresence
+      onPresence: handlePresence,
+      onStroke: handleRemoteStroke,
+      onControl: handleControlMessage
     });
+    // Attach Firebase stream to load history and future persisted strokes
+    attachFirebaseStrokeStream(boardId);
   }
 
   function leaveBoard() {
@@ -1127,6 +1341,7 @@
       state.networking.destroy();
       state.networking = null;
     }
+    detachFirebaseStrokeStream();
     state.boardId = null;
     if (state.overlay) {
       state.overlay.clearRemotes();
@@ -1188,6 +1403,8 @@
     updateBrush: setBrushSettings,
     updateTransform: updateViewTransform,
     clear: clearCanvas,
+    clearForAll: broadcastClear,
+    clearPersisted,
     setTool,
     getClientId: () => state.clientId,
     getCurrentBoard: () => state.boardId

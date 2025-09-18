@@ -736,6 +736,13 @@ function boot(){
   // Identity used by whiteboard networking (matches whiteboard.js selection)
   const myId = (DB.user && DB.user.uid) || (window.Whiteboard && typeof window.Whiteboard.getClientId==='function' ? window.Whiteboard.getClientId() : null) || 'anon';
 
+  // --- Ownership/Participants helpers (must be defined before used) ---
+  const ownerBoards = new Set(); // codes I own
+  const heartbeats = new Map(); // code -> intervalId
+  let currentBoard = null; // currently joined code
+  let boardChannel = null; // BroadcastChannel for current board traffic
+  const participants = new Map(); // userId -> {userId, name, color, idle, lastUpdate}
+
   function generateBoardCode() {
     // Simple human-friendly 6-char code (A-Z0-9)
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -750,6 +757,7 @@ function boot(){
     const shareBtn = $('#whiteboardShareBtn');
     const leaveBtn = $('#whiteboardLeaveBtn');
     const overlay = $('#whiteboardOverlay');
+    const meta = $('#whiteboardMeta');
     currentBoard = boardId || null;
     if (boardId) {
       if (title) title.textContent = 'Board — ' + boardId;
@@ -758,6 +766,14 @@ function boot(){
       if (leaveBtn) leaveBtn.disabled = false;
       attachBoardChannel(boardId);
       if (overlay) overlay.classList.add('hidden');
+      // Ensure members badge exists
+      if (meta && !meta.querySelector('.wb-members')){
+        const badge = document.createElement('span');
+        badge.className = 'wb-members';
+        badge.textContent = '0 members';
+        meta.appendChild(badge);
+      }
+      updateMembersBadge();
     } else {
       if (title) title.textContent = 'Select a whiteboard';
       if (codeEl) codeEl.textContent = '';
@@ -765,6 +781,7 @@ function boot(){
       if (leaveBtn) leaveBtn.disabled = true;
       detachBoardChannel();
       if (overlay) overlay.classList.remove('hidden');
+      if (meta) meta.innerHTML = '';
     }
   }
 
@@ -790,9 +807,17 @@ function boot(){
       const top = document.createElement('span');
       top.textContent = code;
       const sub = document.createElement('small');
-      sub.textContent = ownerBoards.has(code) ? 'Owner' : (isActive ? 'Active' : 'Inactive');
+      const info = ownerBoards.has(code) ? 'Owner' : (isActive ? 'Active' : 'Inactive');
+      const last = boardLastActive.get(code);
+      if (last) {
+        const dt = new Date(last);
+        sub.title = dt.toLocaleString();
+      }
+      sub.textContent = info;
       item.appendChild(top);
       item.appendChild(sub);
+      // Start watchers for stats
+      ensureBoardWatcher(code);
       item.onclick = () => {
         // Only allow joining active boards, or boards I own
         if (!isBoardActive(code) && !ownerBoards.has(code)) { showToast('Board is not active (no owner). Ask the owner to open it.', 3000); return; }
@@ -867,7 +892,14 @@ function boot(){
     try {
       const cur = (window.Whiteboard && typeof window.Whiteboard.getCurrentBoard === 'function') ? window.Whiteboard.getCurrentBoard() : null;
       if (!cur) { showToast('No board selected', 1500); return; }
-      if (window.Whiteboard && typeof window.Whiteboard.clear === 'function') { window.Whiteboard.clear(); showToast('Cleared board', 1500); }
+      if (ownerBoards.has(cur)){
+        // Owner clears: broadcast to all and wipe persistence
+        if (window.Whiteboard && typeof window.Whiteboard.clearForAll === 'function') window.Whiteboard.clearForAll();
+        if (window.Whiteboard && typeof window.Whiteboard.clearPersisted === 'function') window.Whiteboard.clearPersisted();
+      } else {
+        if (window.Whiteboard && typeof window.Whiteboard.clear === 'function') window.Whiteboard.clear();
+      }
+      showToast('Cleared board', 1500);
     } catch(e){ console.warn('Clear failed', e); }
   };
 
@@ -881,13 +913,6 @@ function boot(){
 
   // Wire up initial list
   renderWhiteboardList();
-
-  // --- Ownership/Participants helpers ---
-  const ownerBoards = new Set(); // codes I own
-  const heartbeats = new Map(); // code -> intervalId
-  let currentBoard = null; // currently joined code
-  let boardChannel = null; // BroadcastChannel for current board traffic
-  const participants = new Map(); // userId -> {userId, name, color, idle, lastUpdate}
 
   function markAsOwner(code){
     ownerBoards.add(code);
@@ -913,6 +938,8 @@ function boot(){
     boardChannel.onmessage = (ev)=>{ handleBoardMessage(ev && ev.data || ev); };
     participants.clear();
     renderParticipants();
+    // mark last-active now
+    boardLastActive.set(code, Date.now());
   }
 
   function detachBoardChannel(){
@@ -925,6 +952,8 @@ function boot(){
     if(!p || !p.userId) return; const r = participants.get(p.userId) || { userId: p.userId };
     if(p.name) r.name = p.name; if(p.color) r.color = p.color; if(typeof p.idle==='boolean') r.idle = p.idle;
     r.lastUpdate = Date.now(); participants.set(p.userId, r);
+    // bump last-active and badge
+    if(currentBoard){ boardLastActive.set(currentBoard, Date.now()); updateMembersBadge(); }
   }
 
   function handleBoardMessage(msg){
@@ -935,6 +964,7 @@ function boot(){
       else if(p.action === 'idle') { upsertParticipant({ userId: uid, name: p.name, color: p.color, idle: true }); }
       else { upsertParticipant({ userId: uid, name: p.name, color: p.color, idle: false }); }
       renderParticipants();
+      if(currentBoard){ boardLastActive.set(currentBoard, Date.now()); updateMembersBadge(); }
     } else if(msg.type === 'control'){
       const c = msg.payload || {};
       if(c.action === 'kick' && c.targetUserId === myId){
@@ -963,6 +993,32 @@ function boot(){
       }
       container.appendChild(row);
     });
+    updateMembersBadge();
+  }
+
+  // -------- Board stats: members count + last active --------
+  const boardWatchers = new Map(); // code -> unsubscribe function(s)
+  const boardLastActive = new Map();
+  function ensureBoardWatcher(code){
+    if (boardWatchers.has(code)) return;
+    // Watch owner heartbeats to update lastActive
+    const reg = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel(REGISTRY_CH) : null;
+    const onReg = (ev)=>{
+      const msg = ev && ev.data || ev; if(!msg || msg.boardId !== code) return;
+      if(msg.type==='heartbeat' || msg.type==='create'){ boardLastActive.set(code, msg.ts || Date.now()); renderWhiteboardList(); }
+      if(msg.type==='destroy'){ boardLastActive.set(code, Date.now()); renderWhiteboardList(); }
+    };
+    if (reg) reg.addEventListener('message', onReg);
+    // Also listen to board channel passively to detect presence/strokes updates
+    let bc = null; if(typeof BroadcastChannel !== 'undefined'){ bc = new BroadcastChannel('whiteboard:' + code); bc.addEventListener('message', ()=>{ boardLastActive.set(code, Date.now()); renderWhiteboardList(); }); }
+    boardWatchers.set(code, ()=>{ try{ if(reg) reg.removeEventListener('message', onReg); }catch(_){} try{ if(bc) bc.close(); }catch(_){} });
+  }
+  function disposeBoardWatcher(code){ const fn = boardWatchers.get(code); if(fn){ try{ fn(); }catch(_){} boardWatchers.delete(code); } }
+  function updateMembersBadge(){
+    const meta = $('#whiteboardMeta'); if(!meta) return;
+    const badge = meta.querySelector('.wb-members'); if(!badge) return;
+    const count = participants.size;
+    badge.textContent = `${count} member${count===1?'':'s'}`;
   }
 
   // Clean up on unload (owners announce destroy)

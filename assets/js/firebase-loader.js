@@ -65,6 +65,7 @@ window.firebase.deleteField = deleteField;
 window.firebase.ref = ref;
 window.firebase.set = set;
 window.firebase.get = get;
+window.firebase.push = push;
 window.firebase.update = update;
 window.firebase.remove = remove;
 window.firebase.off = off;
