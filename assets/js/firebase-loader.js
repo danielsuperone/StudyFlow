@@ -63,7 +63,11 @@ window.firebase.serverTimestamp = serverTimestamp;
 window.firebase.writeBatch = writeBatch;
 window.firebase.deleteField = deleteField;
 window.firebase.ref = ref;
-window.firebase.set = set;\r\nwindow.firebase.get = get;\r\nwindow.firebase.update = update;\r\nwindow.firebase.remove = remove;\r\nwindow.firebase.off = off;
+window.firebase.set = set;
+window.firebase.get = get;
+window.firebase.update = update;
+window.firebase.remove = remove;
+window.firebase.off = off;
 
 // Provide compat helper functions used in legacy checks
 window.firebase.auth = (app)=> getAuth(app);

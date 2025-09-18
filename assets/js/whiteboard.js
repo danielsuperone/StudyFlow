@@ -666,17 +666,17 @@
 
     selectBoard: async function(code){
       if(!code || code === this.currentBoard) return;
+      if(!isFirebaseReady() || !this.currentUser){
+        showToast('Firebase not ready.');
+        return;
+      }
       this.currentBoard = code;
       this.boardData = null;
       this.isAdmin = false;
       this.detachBoardListeners();
       this.toggleBoardActions();
       this.highlightBoard(code);
-      if(!this.dom.list) return;
-      this.dom.list.querySelectorAll('[data-board-code]').forEach(el=>{
-        const selected = el.getAttribute('data-board-code') === code;
-        el.classList.toggle('active', selected);
-        el.setAttribute('aria-selected', selected ? 'true' : 'false');
+
       const fs = this.firestore || window.firebase.getFirestore(window.firebase._app);
       this.firestore = fs;
       const boardRef = window.firebase.firestore.doc(fs, 'whiteboards', code);
@@ -696,6 +696,7 @@
         showToast('Unable to open whiteboard.');
         return;
       }
+
       this.unsubBoard = window.firebase.firestore.onSnapshot(boardRef, (snap)=> this.applyBoardSnapshot(snap), (err)=>{
         console.warn('Board listener error', err);
         showToast('Connection issue on whiteboard.');
@@ -718,6 +719,10 @@
         el.classList.toggle('active', selected);
         el.setAttribute('aria-selected', selected ? 'true' : 'false');
       });
+    },
+
+    },
+    },
     },
 
     applyBoardSnapshot(snap){
