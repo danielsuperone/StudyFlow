@@ -687,7 +687,7 @@ function boot(){
   document.addEventListener('click', (e)=>{ if(window.innerWidth<960){ if(!$('#sidebar').contains(e.target) && !$('#toggleSidebar').contains(e.target)){ $('#sidebar').classList.remove('open'); } } });
 
   // Navigation
-  $$('('#nav button')').forEach(b=> b.onclick = ()=> setActivePage(b.dataset.nav));
+  $$('#nav button').forEach(b=> b.onclick = ()=> setActivePage(b.dataset.nav));
 
   // View toggle
   $$('#viewToggle button').forEach(b=> b.onclick = ()=> setView(b.dataset.view));
@@ -761,6 +761,11 @@ function boot(){
 }
 
 document.addEventListener('DOMContentLoaded', boot);
+
+
+
+
+
 
 
 
