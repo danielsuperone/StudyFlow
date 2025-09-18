@@ -803,6 +803,7 @@
     listenersAttached: false,
     stageEl: null,
     canvasEl: null,
+    ctx: null,
     cursorContainer: null,
     overlay: null,
     transform: new ViewTransform(),
@@ -812,7 +813,9 @@
     networking: null,
     pointerDown: false,
     localPointerWorld: { x: 0, y: 0 },
+    lastCanvasPoint: null,
     brush: { radius: 6, color: '#2e2e2e' },
+    tool: 'pen', // 'pen' | 'highlighter' | 'eraser'
     lastPointerMove: 0,
     identity: null
   };
@@ -849,6 +852,13 @@
     state.cursorContainer = document.getElementById('whiteboardCursors');
     if (!state.stageEl || !state.cursorContainer) {
       return;
+    }
+    if (state.canvasEl && !state.ctx) {
+      state.ctx = state.canvasEl.getContext('2d');
+      if (state.ctx) {
+        state.ctx.lineCap = 'round';
+        state.ctx.lineJoin = 'round';
+      }
     }
     if (!state.clientId) {
       state.clientId = getOrCreateClientId();
@@ -887,6 +897,21 @@
     if (sizeInput) {
       sizeInput.addEventListener('input', handleBrushSizeChange);
     }
+
+    // Tool buttons
+    const toolbar = document.getElementById('whiteboardToolbar');
+    if (toolbar) {
+      toolbar.addEventListener('click', (ev) => {
+        const btn = ev.target && ev.target.closest ? ev.target.closest('[data-tool]') : null;
+        if (!btn) return;
+        const tool = btn.getAttribute('data-tool');
+        if (!tool) return;
+        setTool(tool);
+        // update active class
+        const buttons = toolbar.querySelectorAll('.whiteboard-tool');
+        buttons.forEach((b) => b.classList.toggle('active', b === btn));
+      });
+    }
   }
 
   function handleBrushColorChange(event) {
@@ -916,6 +941,7 @@
   function handlePointerDown(event) {
     if (!state.stageEl) return;
     state.pointerDown = true;
+    state.lastCanvasPoint = getCanvasPointFromEvent(event);
     if (event.pointerId != null && event.target && event.target.setPointerCapture) {
       try { event.target.setPointerCapture(event.pointerId); } catch (err) { /* ignore */ }
     }
@@ -931,6 +957,11 @@
       const screenX = e.clientX - rect.left;
       const screenY = e.clientY - rect.top;
       lastWorld = state.transform.screenToWorld({ x: screenX, y: screenY });
+      // Draw on canvas using canvas pixel coordinates
+      if (state.pointerDown && state.ctx && state.canvasEl) {
+        const p = getCanvasPointFromEvent(e);
+        drawLineTo(p);
+      }
     }
     if (!lastWorld) return;
     state.localPointerWorld = lastWorld;
@@ -951,6 +982,7 @@
 
   function handlePointerUp(event) {
     state.pointerDown = false;
+    state.lastCanvasPoint = null;
     if (event.pointerId != null && event.target && event.target.releasePointerCapture) {
       try { event.target.releasePointerCapture(event.pointerId); } catch (err) { /* ignore */ }
     }
@@ -967,6 +999,57 @@
     if (state.networking) {
       state.networking.pokeIdle();
     }
+  }
+
+  function getCanvasPointFromEvent(e) {
+    if (!state.canvasEl) return { x: 0, y: 0 };
+    const rect = state.canvasEl.getBoundingClientRect();
+    const scaleX = state.canvasEl.width / rect.width;
+    const scaleY = state.canvasEl.height / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+    return { x, y };
+  }
+
+  function drawLineTo(p) {
+    const ctx = state.ctx; if (!ctx) return;
+    const prev = state.lastCanvasPoint || p;
+    const tool = state.tool || 'pen';
+    ctx.save();
+    if (tool === 'eraser') {
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.strokeStyle = 'rgba(0,0,0,1)';
+      ctx.lineWidth = Math.max(2, state.brush.radius * 2);
+      ctx.globalAlpha = 1;
+    } else if (tool === 'highlighter') {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = state.brush.color;
+      ctx.lineWidth = Math.max(2, state.brush.radius * 1.6);
+      ctx.globalAlpha = 0.35;
+    } else { // pen
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = state.brush.color;
+      ctx.lineWidth = Math.max(1, state.brush.radius);
+      ctx.globalAlpha = 1;
+    }
+    ctx.beginPath();
+    ctx.moveTo(prev.x, prev.y);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+    ctx.closePath();
+    ctx.restore();
+    state.lastCanvasPoint = p;
+  }
+
+  function clearCanvas() {
+    if (state.ctx && state.canvasEl) {
+      state.ctx.clearRect(0, 0, state.canvasEl.width, state.canvasEl.height);
+    }
+  }
+
+  function setTool(tool) {
+    if (!tool) return; const allowed = ['pen', 'highlighter', 'eraser'];
+    if (allowed.includes(tool)) { state.tool = tool; }
   }
 
   function handleResize() {
@@ -1104,6 +1187,8 @@
     leave: leaveBoard,
     updateBrush: setBrushSettings,
     updateTransform: updateViewTransform,
+    clear: clearCanvas,
+    setTool,
     getClientId: () => state.clientId,
     getCurrentBoard: () => state.boardId
   };

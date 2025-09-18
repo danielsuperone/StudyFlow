@@ -749,6 +749,7 @@ function boot(){
     const codeEl = $('#whiteboardCode');
     const shareBtn = $('#whiteboardShareBtn');
     const leaveBtn = $('#whiteboardLeaveBtn');
+    const overlay = $('#whiteboardOverlay');
     currentBoard = boardId || null;
     if (boardId) {
       if (title) title.textContent = 'Board — ' + boardId;
@@ -756,12 +757,14 @@ function boot(){
       if (shareBtn) shareBtn.disabled = false;
       if (leaveBtn) leaveBtn.disabled = false;
       attachBoardChannel(boardId);
+      if (overlay) overlay.classList.add('hidden');
     } else {
       if (title) title.textContent = 'Select a whiteboard';
       if (codeEl) codeEl.textContent = '';
       if (shareBtn) shareBtn.disabled = true;
       if (leaveBtn) leaveBtn.disabled = true;
       detachBoardChannel();
+      if (overlay) overlay.classList.remove('hidden');
     }
   }
 
@@ -773,14 +776,29 @@ function boot(){
     const list = $('#whiteboardList');
     if (!list) return;
     list.innerHTML = '';
+    if (!_wbList.length) {
+      const empty = document.createElement('div');
+      empty.className = 'whiteboard-empty-list';
+      empty.textContent = 'No boards yet — create one to get started';
+      list.appendChild(empty);
+      return;
+    }
     _wbList.forEach(code => {
-      const btn = document.createElement('button');
-      btn.className = 'wb-item';
-      btn.textContent = code;
-      btn.onclick = () => {
-        try { if (window.Whiteboard && typeof window.Whiteboard.join === 'function') { window.Whiteboard.join(code); setWhiteboardUIFor(code); } } catch(e){}
+      const item = document.createElement('div');
+      const isActive = isBoardActive(code) || ownerBoards.has(code);
+      item.className = 'whiteboard-item' + (currentBoard === code ? ' active' : '');
+      const top = document.createElement('span');
+      top.textContent = code;
+      const sub = document.createElement('small');
+      sub.textContent = ownerBoards.has(code) ? 'Owner' : (isActive ? 'Active' : 'Inactive');
+      item.appendChild(top);
+      item.appendChild(sub);
+      item.onclick = () => {
+        // Only allow joining active boards, or boards I own
+        if (!isBoardActive(code) && !ownerBoards.has(code)) { showToast('Board is not active (no owner). Ask the owner to open it.', 3000); return; }
+        try { if (window.Whiteboard && typeof window.Whiteboard.join === 'function') { window.Whiteboard.join(code); setWhiteboardUIFor(code); renderWhiteboardList(); } } catch(e){}
       };
-      list.appendChild(btn);
+      list.appendChild(item);
     });
   }
 
@@ -847,12 +865,9 @@ function boot(){
   const clearBtn = $('#whiteboardClearBtn');
   if (clearBtn) clearBtn.onclick = () => {
     try {
-      // There is no explicit 'clear canvas' API in the whiteboard module; simulate by leaving and re-joining which clears remotes
       const cur = (window.Whiteboard && typeof window.Whiteboard.getCurrentBoard === 'function') ? window.Whiteboard.getCurrentBoard() : null;
       if (!cur) { showToast('No board selected', 1500); return; }
-      // Quick approach: leave then rejoin to reset overlay state
-      window.Whiteboard.leave();
-      setTimeout(()=>{ try{ window.Whiteboard.join(cur); setWhiteboardUIFor(cur); showToast('Cleared board', 1500); }catch(e){ console.warn(e); } }, 50);
+      if (window.Whiteboard && typeof window.Whiteboard.clear === 'function') { window.Whiteboard.clear(); showToast('Cleared board', 1500); }
     } catch(e){ console.warn('Clear failed', e); }
   };
 
@@ -936,10 +951,11 @@ function boot(){
     if(!currentBoard) return;
     const iAmOwner = ownerBoards.has(currentBoard);
     participants.forEach((rec)=>{
-      const row = document.createElement('div'); row.className = 'wb-participant';
+      const row = document.createElement('div');
+      row.className = 'whiteboard-participant' + (rec.userId === myId ? ' self' : '') + (iAmOwner && rec.userId === myId ? ' admin' : '');
       const name = document.createElement('span'); name.textContent = (rec.name || (rec.userId||'user').slice(-6)); row.appendChild(name);
       if(iAmOwner && rec.userId !== myId){
-        const btn = document.createElement('button'); btn.className = 'btn ghost'; btn.textContent = 'Remove';
+        const btn = document.createElement('button'); btn.className = 'remove'; btn.title = 'Remove user'; btn.innerText = '×';
         btn.onclick = ()=>{
           try{ if(boardChannel){ boardChannel.postMessage({ boardId: currentBoard, senderId: myId, type: 'control', payload: { action:'kick', targetUserId: rec.userId, requestedBy: myId, ts: Date.now() } }); } }catch(_){}
         };
