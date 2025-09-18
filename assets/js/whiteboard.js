@@ -854,7 +854,10 @@
     dbUnsubscribe: null,
     dbBatch: [],
     dbFlushTimer: null,
-    dbFlushIntervalMs: 140
+    dbFlushIntervalMs: 140,
+    // UI bits
+    loadingEl: null,
+    loadingTimer: null
   };
 
   function getOrCreateClientId() {
@@ -914,6 +917,43 @@
       state.listenersAttached = true;
     }
     state.initialized = true;
+  }
+
+  // --- Lightweight UI: history loading indicator ---
+  function showHistoryLoading() {
+    try {
+      if (state.loadingEl) return;
+      const meta = document.getElementById('whiteboardMeta');
+      if (!meta) return;
+      const el = document.createElement('span');
+      el.className = 'wb-history-loading';
+      el.textContent = 'Loading history…';
+      // Minimal inline styling to avoid CSS edits
+      el.style.marginLeft = '8px';
+      el.style.padding = '2px 8px';
+      el.style.borderRadius = '9999px';
+      el.style.fontSize = '12px';
+      el.style.lineHeight = '16px';
+      el.style.background = 'var(--chip-bg, #eef2ff)';
+      el.style.color = 'var(--muted, #6b7280)';
+      el.style.border = '1px solid rgba(0,0,0,0.05)';
+      el.setAttribute('aria-live', 'polite');
+      meta.appendChild(el);
+      state.loadingEl = el;
+      // Fallback auto-hide in case something gets stuck
+      if (state.loadingTimer) { try { clearTimeout(state.loadingTimer); } catch(_){} }
+      state.loadingTimer = setTimeout(() => hideHistoryLoading(), 15000);
+    } catch(_) { /* ignore */ }
+  }
+
+  function hideHistoryLoading() {
+    try {
+      if (state.loadingTimer) { clearTimeout(state.loadingTimer); state.loadingTimer = null; }
+      if (state.loadingEl && state.loadingEl.parentNode) {
+        state.loadingEl.parentNode.removeChild(state.loadingEl);
+      }
+      state.loadingEl = null;
+    } catch(_) { /* ignore */ }
   }
 
   function attachEventListeners() {
@@ -1246,6 +1286,7 @@
     const hasBC = (typeof BroadcastChannel === 'function');
     // Load history first (one-time)
     try{
+      showHistoryLoading();
       window.firebase.get(base).then((snap)=>{
         try{
           const data = snap && typeof snap.forEach === 'function' ? snap : null;
@@ -1261,6 +1302,9 @@
             if (segsAll.length) handleRemoteStroke(segsAll);
           }
         }catch(_){ }
+      }).finally(() => {
+        // Hide indicator regardless of success
+        hideHistoryLoading();
       });
     }catch(_){ }
     // If BroadcastChannel exists, rely on it for live; otherwise subscribe to DB live
@@ -1281,6 +1325,7 @@
     try{
       if (state.dbUnsubscribe) { state.dbUnsubscribe(); state.dbUnsubscribe = null; }
       if (state.dbRef) { window.firebase.off(state.dbRef); state.dbRef = null; }
+      hideHistoryLoading();
     }catch(_){ /* noop */ }
   }
 
@@ -1346,6 +1391,7 @@
     if (state.overlay) {
       state.overlay.clearRemotes();
     }
+    hideHistoryLoading();
   }
 
   function setBrushSettings(settings = {}) {

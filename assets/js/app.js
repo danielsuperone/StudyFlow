@@ -722,13 +722,47 @@ function boot(){
   const activeBoards = new Map(); // code -> { ownerId, lastTs }
   const ACTIVE_TTL_MS = 7000;
   function isBoardActive(code){ const e = activeBoards.get(code); return !!(e && (Date.now() - e.lastTs) <= ACTIVE_TTL_MS); }
+  // Debounced sidebar stats updates
+  let _wbStatsDirty = false;
+  let _wbStatsTimer = null;
+  const _WB_STATS_DEBOUNCE = 250; // ms
+  function scheduleSidebarStatsUpdate(){
+    _wbStatsDirty = true;
+    if(_wbStatsTimer) return;
+    _wbStatsTimer = setTimeout(()=>{
+      _wbStatsTimer = null;
+      if(!_wbStatsDirty) return;
+      _wbStatsDirty = false;
+      refreshWhiteboardItemTitles();
+    }, _WB_STATS_DEBOUNCE);
+  }
+  function refreshWhiteboardItemTitles(){
+    try{
+      const list = document.getElementById('whiteboardList'); if(!list) return;
+      const items = Array.from(list.querySelectorAll('.whiteboard-item'));
+      for(const item of items){
+        const codeEl = item.querySelector('span');
+        const small = item.querySelector('small');
+        if(!codeEl || !small) continue;
+        const code = codeEl.textContent;
+        const last = boardLastActive.get(code);
+        if(last){ const dt = new Date(last); small.title = dt.toLocaleString(); }
+        // Also update Active/Inactive label without full re-render
+        const isActive = isBoardActive(code) || ownerBoards.has(code);
+        const info = ownerBoards.has(code) ? 'Owner' : (isActive ? 'Active' : 'Inactive');
+        small.textContent = info;
+      }
+    }catch(_){}
+  }
   if(registry){
     registry.onmessage = (ev)=>{
       const msg = ev && ev.data || ev; if(!msg || !msg.boardId) return;
       if(msg.type==='create' || msg.type==='heartbeat'){
         activeBoards.set(msg.boardId, { ownerId: msg.ownerId, lastTs: msg.ts||Date.now() });
+        scheduleSidebarStatsUpdate();
       } else if(msg.type==='destroy'){
         activeBoards.delete(msg.boardId);
+        scheduleSidebarStatsUpdate();
       }
     };
   }
@@ -742,6 +776,10 @@ function boot(){
   let currentBoard = null; // currently joined code
   let boardChannel = null; // BroadcastChannel for current board traffic
   const participants = new Map(); // userId -> {userId, name, color, idle, lastUpdate}
+
+  // Board stats storage (declare before first use)
+  const boardWatchers = new Map(); // code -> unsubscribe function(s)
+  const boardLastActive = new Map();
 
   function generateBoardCode() {
     // Simple human-friendly 6-char code (A-Z0-9)
@@ -825,6 +863,8 @@ function boot(){
       };
       list.appendChild(item);
     });
+    // After (re)render, schedule one pass to ensure tooltips are up-to-date without thrashing
+    scheduleSidebarStatsUpdate();
   }
 
   // New board
@@ -997,20 +1037,18 @@ function boot(){
   }
 
   // -------- Board stats: members count + last active --------
-  const boardWatchers = new Map(); // code -> unsubscribe function(s)
-  const boardLastActive = new Map();
   function ensureBoardWatcher(code){
     if (boardWatchers.has(code)) return;
     // Watch owner heartbeats to update lastActive
     const reg = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel(REGISTRY_CH) : null;
     const onReg = (ev)=>{
       const msg = ev && ev.data || ev; if(!msg || msg.boardId !== code) return;
-      if(msg.type==='heartbeat' || msg.type==='create'){ boardLastActive.set(code, msg.ts || Date.now()); renderWhiteboardList(); }
-      if(msg.type==='destroy'){ boardLastActive.set(code, Date.now()); renderWhiteboardList(); }
+      if(msg.type==='heartbeat' || msg.type==='create'){ boardLastActive.set(code, msg.ts || Date.now()); scheduleSidebarStatsUpdate(); }
+      if(msg.type==='destroy'){ boardLastActive.set(code, Date.now()); scheduleSidebarStatsUpdate(); }
     };
     if (reg) reg.addEventListener('message', onReg);
     // Also listen to board channel passively to detect presence/strokes updates
-    let bc = null; if(typeof BroadcastChannel !== 'undefined'){ bc = new BroadcastChannel('whiteboard:' + code); bc.addEventListener('message', ()=>{ boardLastActive.set(code, Date.now()); renderWhiteboardList(); }); }
+    let bc = null; if(typeof BroadcastChannel !== 'undefined'){ bc = new BroadcastChannel('whiteboard:' + code); bc.addEventListener('message', ()=>{ boardLastActive.set(code, Date.now()); scheduleSidebarStatsUpdate(); }); }
     boardWatchers.set(code, ()=>{ try{ if(reg) reg.removeEventListener('message', onReg); }catch(_){} try{ if(bc) bc.close(); }catch(_){} });
   }
   function disposeBoardWatcher(code){ const fn = boardWatchers.get(code); if(fn){ try{ fn(); }catch(_){} boardWatchers.delete(code); } }
