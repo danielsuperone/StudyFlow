@@ -1,0 +1,7 @@
+# Node / env
+node_modules/
+server/.env
+.DS_Store
+.env.local
+*.log
+assets/js/firebase-config.js
