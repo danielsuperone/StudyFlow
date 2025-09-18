@@ -857,8 +857,10 @@ function boot(){
       // Start watchers for stats
       ensureBoardWatcher(code);
       item.onclick = () => {
-        // Only allow joining active boards, or boards I own
-        if (!isBoardActive(code) && !ownerBoards.has(code)) { showToast('Board is not active (no owner). Ask the owner to open it.', 3000); return; }
+        // Allow joining even if owner heartbeat isn't detected (cross-device)
+        if (!isBoardActive(code) && !ownerBoards.has(code)) {
+          showToast('Owner not detected — joining anyway', 2000);
+        }
         try { if (window.Whiteboard && typeof window.Whiteboard.join === 'function') { window.Whiteboard.join(code); setWhiteboardUIFor(code); renderWhiteboardList(); } } catch(e){}
       };
       list.appendChild(item);
@@ -898,7 +900,7 @@ function boot(){
     if (!code) { showToast('Enter a board code to join', 2000); return; }
     if (!DB.user) { requestSignIn(); return; }
     const active = isBoardActive(code) || ownerBoards.has(code);
-    if (!active) { showToast('Board is not active (no owner). Ask the owner to open it first.', 3500); return; }
+    if (!active) { showToast('Owner not detected — joining anyway', 2000); }
     if (!_wbList.includes(code)) { _wbList.unshift(code); saveWbList(); renderWhiteboardList(); }
     try {
       window.Whiteboard.join(code);

@@ -857,7 +857,10 @@
     dbFlushIntervalMs: 140,
     // UI bits
     loadingEl: null,
-    loadingTimer: null
+    loadingTimer: null,
+    // Permissions & local fallback
+    dbWritesDisabled: false,
+    localHistory: new Map()
   };
 
   function getOrCreateClientId() {
@@ -1148,6 +1151,8 @@
     if (state.networking) {
       state.networking.send({ type: 'control', payload: { action: 'clear', ts: Date.now() } });
     }
+    // Also clear local fallback for this board
+    try{ if(state.boardId) state.localHistory.delete(state.boardId); }catch(_){ }
   }
 
   async function clearPersisted(){
@@ -1159,6 +1164,8 @@
       const base = window.firebase.ref(db, `whiteboards/${state.boardId}/strokes`);
       await window.firebase.remove(base);
     }catch(_){ /* ignore */ }
+    // Clear local fallback as well
+    try{ state.localHistory.delete(state.boardId); }catch(_){ }
   }
 
   function setTool(tool) {
@@ -1254,6 +1261,15 @@
     }
     // For DB persistence: coalesce into slightly larger batches
     state.dbBatch.push(seg);
+    // Keep local fallback per-board as well (session only)
+    try{
+      if(state.boardId){
+        const arr = state.localHistory.get(state.boardId) || [];
+        arr.push(seg);
+        if(arr.length > 50000) arr.splice(0, arr.length - 50000);
+        state.localHistory.set(state.boardId, arr);
+      }
+    }catch(_){ }
     if (!state.dbFlushTimer) {
       state.dbFlushTimer = setTimeout(()=>{
         state.dbFlushTimer = null;
@@ -1302,6 +1318,9 @@
             if (segsAll.length) handleRemoteStroke(segsAll);
           }
         }catch(_){ }
+      }).catch((_err)=>{
+        // Likely permission_denied; disable DB writes to suppress spam
+        state.dbWritesDisabled = true;
       }).finally(() => {
         // Hide indicator regardless of success
         hideHistoryLoading();
@@ -1331,6 +1350,7 @@
 
   async function flushDbBatch(){
     if (!state.dbBatch.length) return;
+    if (state.dbWritesDisabled) { state.dbBatch.length = 0; return; }
     if (!isFirebaseDbAvailable() || !state.boardId) { state.dbBatch.length = 0; return; }
     const db = getDb(); if (!db) { state.dbBatch.length = 0; return; }
     const base = state.dbRef || window.firebase.ref(db, `whiteboards/${state.boardId}/strokes`);
@@ -1340,6 +1360,7 @@
       await window.firebase.set(node, payload);
     } catch (e) {
       // If write fails (offline/unconfigured), drop batch silently
+      state.dbWritesDisabled = true;
     }
   }
   function joinBoard(boardId, options = {}) {
@@ -1364,6 +1385,8 @@
       return;
     }
     state.boardId = boardId;
+    // New board starts with a blank canvas; history will load shortly
+    clearCanvas();
     if (state.overlay) state.overlay.clearRemotes();
     state.networking = new CursorNetworking({
       boardId,
@@ -1377,8 +1400,17 @@
       onStroke: handleRemoteStroke,
       onControl: handleControlMessage
     });
-    // Attach Firebase stream to load history and future persisted strokes
-    attachFirebaseStrokeStream(boardId);
+    // Attach Firebase stream to load history and future persisted strokes (if available)
+    if (isFirebaseDbAvailable()) {
+      state.dbWritesDisabled = false; // try again for this board
+      attachFirebaseStrokeStream(boardId);
+    } else {
+      // Draw from local session history (fallback)
+      try{
+        const segs = state.localHistory.get(boardId);
+        if (Array.isArray(segs) && segs.length) handleRemoteStroke(segs);
+      }catch(_){ }
+    }
   }
 
   function leaveBoard() {
