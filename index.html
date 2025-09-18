@@ -71,7 +71,7 @@
             <button class="icon-btn" id="profileBtn" aria-label="Open profile"><i data-lucide="chevron-down"></i></button>
             <div class="menu" id="profileMenu">
               <div class="group">
-                <label>Theme</label>
+                <label for="themeSelect">Theme</label>
                 <select id="themeSelect">
                   <option value="mint">Green / Mint</option>
                   <option value="blue">Baby Blue</option>
@@ -133,7 +133,7 @@
         <div class="grid" style="grid-template-columns: 1fr;">
           <div class="card ai-box">
             <h2 style="margin:0">Ask AI</h2>
-            <textarea id="aiInput" placeholder="Try: add lesson math on 2025-09-20 color #6ee7b7 recurring"></textarea>
+            <textarea id="aiInput" aria-label="Ask AI" placeholder="Try: add lesson math on 2025-09-20 color #6ee7b7 recurring"></textarea>
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
               <button class="btn" id="askBtn"><i data-lucide="sparkles"></i> Ask</button>
             </div>
@@ -157,7 +157,7 @@
               <h2>Whiteboards</h2>
               <button class="btn secondary" id="createWhiteboardBtn"><i data-lucide="plus"></i> New board</button>
             </div>
-            <div class="whiteboard-list" id="whiteboardList" role="listbox" aria-label="Your whiteboards"></div>
+            <div class="whiteboard-list" id="whiteboardList" role="listbox" tabindex="0" aria-label="Your whiteboards"></div>
             <div class="whiteboard-join">
               <label for="whiteboardJoinInput">Join with code</label>
               <div class="whiteboard-join-row">
@@ -211,36 +211,36 @@
   </div>
 
   <!-- Modal: Add/Edit Event -->
-  <div class="modal-backdrop" id="modalBackdrop" aria-hidden="true">
+  <div class="modal-backdrop" id="modalBackdrop">
     <div class="modal">
       <h3>Add / Edit Lesson</h3>
       <div class="row">
         <div>
-          <label>Title</label>
+          <label for="evtTitle">Title</label>
           <input id="evtTitle" placeholder="e.g., Chemistry" />
         </div>
         <div>
-          <label>Color</label>
+          <label for="evtColor">Color</label>
           <input id="evtColor" type="color" value="#6ee7b7" />
         </div>
         <div>
-          <label>Start date</label>
+          <label for="evtStartDate">Start date</label>
           <input id="evtStartDate" type="date" />
         </div>
         <div>
-          <label>Start time</label>
+          <label for="evtStartTime">Start time</label>
           <input id="evtStartTime" type="time" />
         </div>
         <div>
-          <label>End date</label>
+          <label for="evtEndDate">End date</label>
           <input id="evtEndDate" type="date" />
         </div>
         <div>
-          <label>End time</label>
+          <label for="evtEndTime">End time</label>
           <input id="evtEndTime" type="time" />
         </div>
         <div class="full">
-          <label>Recurring Weekly?</label>
+          <label for="evtRecurring">Recurring Weekly?</label>
           <select id="evtRecurring">
             <option value="no" selected>No</option>
             <option value="yes">Yes</option>

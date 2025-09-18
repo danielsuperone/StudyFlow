@@ -472,14 +472,13 @@
       if(this.dom.leaveBtn){ this.dom.leaveBtn.disabled = !hasBoard; }
       if(this.dom.clearBtn){ this.dom.clearBtn.disabled = !(hasBoard && this.isAdmin); }
       if(!hasBoard){
-        if(this.dom.title) this.dom.title.textContent = this.currentUser ? 'Select a whiteboard' : 'Sign in to start drawing';
-      if(this.dom.meta){
-        const ownerName = members[data.ownerId] ? members[data.ownerId].displayName : 'Owner';
-        const rel = formatRelative(data.updatedAt || data.createdAt);
-        this.dom.meta.textContent = `${participantIds.length} member${participantIds.length === 1 ? '' : 's'} - Owner: ${ownerName}${rel ? ` - ${rel}` : ''}`;
-      }
-      } else {
-        this.setOverlayVisible(false);
+        if(this.dom.title){ this.dom.title.textContent = this.currentUser ? 'Select a whiteboard' : 'Sign in to start drawing'; }
+        if(this.dom.meta){ this.dom.meta.textContent = ''; }
+        if(this.dom.code){ this.dom.code.textContent = ''; }
+        if(this.dom.participants){ this.dom.participants.innerHTML = ''; }
+        this.strokes = [];
+        this.redrawAllStrokes();
+        this.setOverlayVisible(true, this.currentUser ? 'Select or create a whiteboard to start drawing' : 'Sign in to create a collaborative whiteboard');
       }
     },
 
@@ -550,7 +549,13 @@
         item.type = 'button';
         item.className = 'whiteboard-item';
         item.setAttribute('data-board-code', board.code);
-        if(board.code === this.currentBoard) item.classList.add('active');
+        item.setAttribute('role', 'option');
+        if(board.code === this.currentBoard){
+          item.classList.add('active');
+          item.setAttribute('aria-selected', 'true');
+        } else {
+          item.setAttribute('aria-selected', 'false');
+        }
         const title = document.createElement('span');
         title.textContent = board.title || `Board ${board.code}`;
         const meta = document.createElement('small');
@@ -667,10 +672,11 @@
       this.detachBoardListeners();
       this.toggleBoardActions();
       this.highlightBoard(code);
-      if(!isFirebaseReady() || !this.currentUser){
-        showToast('Firebase not ready.');
-        return;
-      }
+      if(!this.dom.list) return;
+      this.dom.list.querySelectorAll('[data-board-code]').forEach(el=>{
+        const selected = el.getAttribute('data-board-code') === code;
+        el.classList.toggle('active', selected);
+        el.setAttribute('aria-selected', selected ? 'true' : 'false');
       const fs = this.firestore || window.firebase.getFirestore(window.firebase._app);
       this.firestore = fs;
       const boardRef = window.firebase.firestore.doc(fs, 'whiteboards', code);
@@ -708,7 +714,9 @@
     highlightBoard(code){
       if(!this.dom.list) return;
       this.dom.list.querySelectorAll('[data-board-code]').forEach(el=>{
-        el.classList.toggle('active', el.getAttribute('data-board-code') === code);
+        const selected = el.getAttribute('data-board-code') === code;
+        el.classList.toggle('active', selected);
+        el.setAttribute('aria-selected', selected ? 'true' : 'false');
       });
     },
 
@@ -990,6 +998,10 @@
     Whiteboard.init();
   }
 })();
+
+
+
+
 
 
 

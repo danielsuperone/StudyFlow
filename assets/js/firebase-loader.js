@@ -3,7 +3,7 @@
 // Edit firebaseConfig in firebase-config.js (or replace here) with your project values.
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js';
 import { getAuth, signInWithEmailAndPassword, signOut as fbSignOut, createUserWithEmailAndPassword, signInWithPopup, signInWithRedirect, GoogleAuthProvider, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js';
-import { getDatabase, ref, set, get, push, onValue } from 'https://www.gstatic.com/firebasejs/10.12.3/firebase-database.js';
+import { getDatabase, ref, set, get, push, onValue, update, remove, off } from 'https://www.gstatic.com/firebasejs/10.12.3/firebase-database.js';
 import { getFirestore, collection, doc, setDoc, getDoc, getDocs, updateDoc, addDoc, onSnapshot, query, where, orderBy, serverTimestamp, deleteDoc, deleteField, runTransaction, writeBatch, arrayUnion, arrayRemove, Timestamp } from 'https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js';
 import { getAnalytics } from 'https://www.gstatic.com/firebasejs/10.12.3/firebase-analytics.js';
 
@@ -63,8 +63,7 @@ window.firebase.serverTimestamp = serverTimestamp;
 window.firebase.writeBatch = writeBatch;
 window.firebase.deleteField = deleteField;
 window.firebase.ref = ref;
-window.firebase.set = set;
-window.firebase.get = get;
+window.firebase.set = set;\r\nwindow.firebase.get = get;\r\nwindow.firebase.update = update;\r\nwindow.firebase.remove = remove;\r\nwindow.firebase.off = off;
 
 // Provide compat helper functions used in legacy checks
 window.firebase.auth = (app)=> getAuth(app);
@@ -102,6 +101,7 @@ window.firebase.listenForUserEvents = (onChange) => {
 // Note: this loader only exposes the exact functions the app currently uses.
 // If you need additional Firebase services (Firestore, Storage, etc.) import them here
 // and attach them to `window.firebase` similarly.
+
 
 
 
