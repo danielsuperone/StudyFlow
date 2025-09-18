@@ -3,7 +3,7 @@
 // Edit firebaseConfig in firebase-config.js (or replace here) with your project values.
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js';
 import { getAuth, signInWithEmailAndPassword, signOut as fbSignOut, createUserWithEmailAndPassword, signInWithPopup, signInWithRedirect, GoogleAuthProvider, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js';
-import { getDatabase, ref, set, get, push, onValue, update, remove, off } from 'https://www.gstatic.com/firebasejs/10.12.3/firebase-database.js';
+import { getDatabase, ref, set, get, push, onValue, update, remove, off, onChildAdded, onChildRemoved, onChildChanged } from 'https://www.gstatic.com/firebasejs/10.12.3/firebase-database.js';
 import { getFirestore, collection, doc, setDoc, getDoc, getDocs, updateDoc, addDoc, onSnapshot, query, where, orderBy, serverTimestamp, deleteDoc, deleteField, runTransaction, writeBatch, arrayUnion, arrayRemove, Timestamp } from 'https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js';
 import { getAnalytics } from 'https://www.gstatic.com/firebasejs/10.12.3/firebase-analytics.js';
 
@@ -68,6 +68,9 @@ window.firebase.get = get;
 window.firebase.update = update;
 window.firebase.remove = remove;
 window.firebase.off = off;
+window.firebase.onChildAdded = (r, cb)=> onChildAdded(r, cb);
+window.firebase.onChildRemoved = (r, cb)=> onChildRemoved(r, cb);
+window.firebase.onChildChanged = (r, cb)=> onChildChanged(r, cb);
 
 // Provide compat helper functions used in legacy checks
 window.firebase.auth = (app)=> getAuth(app);

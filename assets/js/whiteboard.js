@@ -78,6 +78,10 @@
   }
 
   function lucideRefresh(root){
+function hasDocChanges(snap){
+  return snap && typeof snap.docChanges === 'function';
+}
+
     try{
       if(window.lucide && typeof window.lucide.createIcons === 'function'){
         window.lucide.createIcons({ root: root || document });
@@ -96,6 +100,7 @@
     boardData:null,
     isAdmin:false,
     strokes:[],
+    strokesMap:new Map(),
     ctx:null,
     canvasWidth:0,
     canvasHeight:0,
@@ -676,6 +681,9 @@
       this.detachBoardListeners();
       this.toggleBoardActions();
       this.highlightBoard(code);
+      this.strokes = [];
+      this.strokesMap.clear();
+      this.redrawAllStrokes();
 
       const fs = this.firestore || window.firebase.getFirestore(window.firebase._app);
       this.firestore = fs;
@@ -802,19 +810,35 @@
     },
 
     applyStrokesSnapshot(snap){
+      if(!snap){
+        this.strokes = [];
+        this.strokesMap.clear();
+        this.redrawAllStrokes();
+        return;
+      }
+      if(hasDocChanges(snap)){
+        snap.docChanges().forEach(change=>{
+          const key = change.doc && change.doc.id ? change.doc.id : null;
+          if(!key) return;
+          if(change.type === 'removed'){
+            this.removeStroke(key);
+          } else {
+            const data = change.doc.data ? change.doc.data() : {};
+            const stroke = this.parseStrokeSnapshot(key, data);
+            if(stroke) this.upsertStroke(key, stroke);
+          }
+        });
+        return;
+      }
       const strokes = [];
       snap.forEach(docSnap=>{
-        const data = docSnap.data() || {};
-        if(!Array.isArray(data.points)) return;
-        strokes.push({
-          id: docSnap.id,
-          tool: data.tool || 'pen',
-          color: data.color || '#2e2e2e',
-          size: data.size || 6,
-          points: data.points.map(p=>({ x: Number(p.x || 0), y: Number(p.y || 0) }))
-        });
+        const data = docSnap.data ? docSnap.data() : {};
+        const stroke = this.parseStrokeSnapshot(docSnap.id, data);
+        if(stroke) strokes.push(stroke);
       });
       this.strokes = strokes;
+      this.strokesMap.clear();
+      strokes.forEach(st=> this.strokesMap.set(st.id, st));
       this.redrawAllStrokes();
     },
 
