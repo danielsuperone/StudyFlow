@@ -9,9 +9,7 @@ const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate()+n); ret
 const startOfWeek = (d) => { const x=new Date(d); const day=(x.getDay()+6)%7; x.setDate(x.getDate()-day); x.setHours(0,0,0,0); return x; }; // Monday
 const startOfMonth = (d) => { const x=new Date(d); x.setDate(1); x.setHours(0,0,0,0); return x; };
 
-// Toast helper (global) - make available before DB and other code so it can be used anywhere
-function showToast(msg, duration=3000){
-  try{
+function showToast(msg, duration=3000){ try{
     const container = document.getElementById('toast'); if(!container){ console.info('Toast:', msg); return; }
     const t = document.createElement('div'); t.className='toast'; t.textContent = msg; container.appendChild(t); container.style.display='block';
     setTimeout(()=>{ t.style.opacity=1; }, 50);
@@ -97,7 +95,6 @@ const DB = { firebaseConfigured:false, user:null, warnedMissingDb:false, whitebo
       // When not signed in, keep an unsaved snapshot but do not write to the global shared key.
       localStorage.setItem('studyflow_events_unsaved', JSON.stringify(events));
     }
-  },
   },
 
   markWhiteboardPersistenceDisabled(reason){
