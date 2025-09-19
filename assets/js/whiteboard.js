@@ -860,8 +860,78 @@
     loadingTimer: null,
     // Permissions & local fallback
     dbWritesDisabled: false,
-    localHistory: new Map()
+    localHistory: new Map(),
+    localHistoryHashes: new Map()
   };
+  const LOCAL_HISTORY_LIMIT = 50000;
+
+  function segmentHashValue(value) {
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value.toFixed(2) : '0';
+    }
+    if (value === null || value === undefined) return '';
+    return String(value);
+  }
+
+  function createSegmentHash(seg = {}) {
+    return [
+      segmentHashValue(seg.x1),
+      segmentHashValue(seg.y1),
+      segmentHashValue(seg.x2),
+      segmentHashValue(seg.y2),
+      segmentHashValue(seg.color),
+      segmentHashValue(seg.width),
+      segmentHashValue(seg.alpha),
+      segmentHashValue(seg.op),
+      segmentHashValue(seg.tool)
+    ].join('|');
+  }
+
+  function appendToLocalHistory(boardId, segments) {
+    if (!boardId) return;
+    const segs = Array.isArray(segments) ? segments : [segments];
+    if (!segs.length) return;
+    const arr = state.localHistory.get(boardId) || [];
+    let hashes = state.localHistoryHashes.get(boardId);
+    if (!hashes) {
+      hashes = new Set();
+      state.localHistoryHashes.set(boardId, hashes);
+    }
+    for (const seg of segs) {
+      if (!seg || typeof seg !== 'object') continue;
+      const key = createSegmentHash(seg);
+      if (hashes.has(key)) continue;
+      hashes.add(key);
+      arr.push(seg);
+    }
+    if (arr.length > LOCAL_HISTORY_LIMIT) {
+      const overflow = arr.length - LOCAL_HISTORY_LIMIT;
+      const removed = arr.splice(0, overflow);
+      if (removed.length && hashes.size) {
+        for (const seg of removed) {
+          const key = createSegmentHash(seg);
+          hashes.delete(key);
+        }
+      }
+    }
+    state.localHistory.set(boardId, arr);
+  }
+
+  function clearLocalHistory(boardId) {
+    if (!boardId) return;
+    state.localHistory.delete(boardId);
+    state.localHistoryHashes.delete(boardId);
+  }
+
+  function restoreLocalHistory(boardId) {
+    if (!boardId) return;
+    try{
+      const segs = state.localHistory.get(boardId);
+      if (Array.isArray(segs) && segs.length) {
+        handleRemoteStroke(segs, { store: false });
+      }
+    }catch(_){ /* ignore restore errors */ }
+  }
 
   function getOrCreateClientId() {
     if (!isBrowser) return createUid('client');
@@ -1152,7 +1222,7 @@
       state.networking.send({ type: 'control', payload: { action: 'clear', ts: Date.now() } });
     }
     // Also clear local fallback for this board
-    try{ if(state.boardId) state.localHistory.delete(state.boardId); }catch(_){ }
+    try{ clearLocalHistory(state.boardId); }catch(_){ }
   }
 
   async function clearPersisted(){
@@ -1165,7 +1235,7 @@
       await window.firebase.remove(base);
     }catch(_){ /* ignore */ }
     // Clear local fallback as well
-    try{ state.localHistory.delete(state.boardId); }catch(_){ }
+    try{ clearLocalHistory(state.boardId); }catch(_){ }
   }
 
   function setTool(tool) {
@@ -1211,9 +1281,8 @@
     }
   }
 
-  function handleRemoteStroke(payload) {
+  function handleRemoteStroke(payload, options = {}) {
     if (!payload || !state.ctx) return;
-    // Support single or batch payloads
     const drawOne = (seg) => {
       if (!seg) return;
       const ctx = state.ctx;
@@ -1231,10 +1300,10 @@
       ctx.closePath();
       ctx.restore();
     };
-    if (Array.isArray(payload)) {
-      for (const seg of payload) drawOne(seg);
-    } else {
-      drawOne(payload);
+    const segments = Array.isArray(payload) ? payload : [payload];
+    for (const seg of segments) drawOne(seg);
+    if (options.store !== false) {
+      appendToLocalHistory(state.boardId, segments);
     }
   }
 
@@ -1242,6 +1311,7 @@
     if (!payload) return;
     if (payload.action === 'clear') {
       clearCanvas();
+      try{ clearLocalHistory(state.boardId); }catch(_){ }
     }
   }
 
@@ -1263,12 +1333,7 @@
     state.dbBatch.push(seg);
     // Keep local fallback per-board as well (session only)
     try{
-      if(state.boardId){
-        const arr = state.localHistory.get(state.boardId) || [];
-        arr.push(seg);
-        if(arr.length > 50000) arr.splice(0, arr.length - 50000);
-        state.localHistory.set(state.boardId, arr);
-      }
+      appendToLocalHistory(state.boardId, seg);
     }catch(_){ }
     if (!state.dbFlushTimer) {
       state.dbFlushTimer = setTimeout(()=>{
@@ -1388,6 +1453,7 @@
     // New board starts with a blank canvas; history will load shortly
     clearCanvas();
     if (state.overlay) state.overlay.clearRemotes();
+    restoreLocalHistory(boardId);
     state.networking = new CursorNetworking({
       boardId,
       userId: identifier,
@@ -1404,12 +1470,6 @@
     if (isFirebaseDbAvailable()) {
       state.dbWritesDisabled = false; // try again for this board
       attachFirebaseStrokeStream(boardId);
-    } else {
-      // Draw from local session history (fallback)
-      try{
-        const segs = state.localHistory.get(boardId);
-        if (Array.isArray(segs) && segs.length) handleRemoteStroke(segs);
-      }catch(_){ }
     }
   }
 
