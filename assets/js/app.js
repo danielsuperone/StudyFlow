@@ -134,6 +134,143 @@ const DB = { firebaseConfigured:false, user:null, warnedMissingDb:false,
       }
     }
     return readLocal();
+  },
+
+  async persistBoardOwnership(boardId, extraMeta = {}){
+    if(!boardId) return null;
+    if(!this.user || !window.firebase || typeof window.firebase.getDatabase !== 'function') return null;
+    try{
+      const db = window.firebase.getDatabase(window.firebase._app);
+      const hasDbUrl = window.firebase && window.firebase._app && window.firebase._app.options && window.firebase._app.options.databaseURL;
+      if(!db || !hasDbUrl) return null;
+      const uid = this.user.uid;
+      const metaRef = window.firebase.ref(db, `whiteboards_meta/${boardId}`);
+      let existing = null;
+      try{
+        const snap = await window.firebase.get(metaRef);
+        const exists = snap && typeof snap.exists === 'function' ? snap.exists() : !!snap;
+        if(exists){
+          existing = typeof snap.val === 'function' ? snap.val() : (snap && typeof snap.val !== 'undefined' ? snap.val : null);
+        }
+      }catch(_){ }
+      if(existing && existing.ownerId && existing.ownerId !== uid){
+        return existing;
+      }
+      const now = Date.now();
+      const ownerName = this.user.displayName || this.user.email || 'Owner';
+      const updates = {};
+      updates[`whiteboards_meta/${boardId}/boardId`] = boardId;
+      updates[`whiteboards_meta/${boardId}/ownerId`] = uid;
+      updates[`whiteboards_meta/${boardId}/ownerName`] = ownerName;
+      updates[`whiteboards_meta/${boardId}/createdAt`] = existing && existing.createdAt ? existing.createdAt : now;
+      updates[`whiteboards_meta/${boardId}/updatedAt`] = now;
+      updates[`whiteboards_meta/${boardId}/members/${uid}`] = 'owner';
+      if(!(existing && existing.lastActive)){
+        updates[`whiteboards_meta/${boardId}/lastActive`] = now;
+      }
+      if(extraMeta && typeof extraMeta === 'object'){
+        for(const [key, value] of Object.entries(extraMeta)){
+          if(value === undefined) continue;
+          updates[`whiteboards_meta/${boardId}/${key}`] = value;
+        }
+      }
+      updates[`user_whiteboards/${uid}/${boardId}/role`] = 'owner';
+      updates[`user_whiteboards/${uid}/${boardId}/createdAt`] = existing && existing.createdAt ? existing.createdAt : now;
+      updates[`user_whiteboards/${uid}/${boardId}/updatedAt`] = now;
+      await window.firebase.update(window.firebase.ref(db, '/'), updates);
+      const merged = Object.assign({}, existing || {}, { boardId, ownerId: uid, ownerName, createdAt: existing && existing.createdAt ? existing.createdAt : now, updatedAt: now, lastActive: existing && existing.lastActive ? existing.lastActive : now });
+      if(extraMeta && typeof extraMeta === 'object'){
+        Object.assign(merged, extraMeta);
+      }
+      return merged;
+    }catch(e){
+      console.warn('DB.persistBoardOwnership failed', e);
+      return null;
+    }
+  },
+
+  async recordBoardMembership(boardId, role = 'member'){
+    if(!boardId) return;
+    if(!this.user || !window.firebase || typeof window.firebase.getDatabase !== 'function') return;
+    try{
+      const db = window.firebase.getDatabase(window.firebase._app);
+      const hasDbUrl = window.firebase && window.firebase._app && window.firebase._app.options && window.firebase._app.options.databaseURL;
+      if(!db || !hasDbUrl) return;
+      const uid = this.user.uid;
+      const now = Date.now();
+      const updates = {};
+      updates[`user_whiteboards/${uid}/${boardId}/role`] = role;
+      updates[`user_whiteboards/${uid}/${boardId}/updatedAt`] = now;
+      if(role === 'owner'){
+        updates[`user_whiteboards/${uid}/${boardId}/createdAt`] = now;
+      } else {
+        updates[`user_whiteboards/${uid}/${boardId}/joinedAt`] = now;
+      }
+      updates[`whiteboards_meta/${boardId}/members/${uid}`] = role;
+      updates[`whiteboards_meta/${boardId}/updatedAt`] = now;
+      await window.firebase.update(window.firebase.ref(db, '/'), updates);
+    }catch(e){
+      console.warn('DB.recordBoardMembership failed', e);
+    }
+  },
+
+  async loadOwnedBoards(){
+    if(!this.user || !window.firebase || typeof window.firebase.getDatabase !== 'function') return [];
+    try{
+      const db = window.firebase.getDatabase(window.firebase._app);
+      const hasDbUrl = window.firebase && window.firebase._app && window.firebase._app.options && window.firebase._app.options.databaseURL;
+      if(!db || !hasDbUrl) return [];
+      const ref = window.firebase.ref(db, `user_whiteboards/${this.user.uid}`);
+      const snap = await window.firebase.get(ref);
+      const result = [];
+      if(snap){
+        if(typeof snap.forEach === 'function'){
+          snap.forEach((child)=>{
+            try{
+              if(!child) return;
+              const val = typeof child.val === 'function' ? child.val() : (child && typeof child.val !== 'undefined' ? child.val : null);
+              const role = val && typeof val === 'object' && 'role' in val ? val.role : val;
+              if(role === 'owner' || role === true){ result.push(child.key); }
+            }catch(_){ }
+          });
+        }
+        if(!result.length){
+          const raw = typeof snap.val === 'function' ? snap.val() : (snap && typeof snap.val !== 'undefined' ? snap.val : null);
+          if(raw && typeof raw === 'object'){
+            Object.keys(raw).forEach((code)=>{
+              try{
+                const val = raw[code];
+                const role = val && typeof val === 'object' && 'role' in val ? val.role : val;
+                if(role === 'owner' || role === true){ result.push(code); }
+              }catch(_){ }
+            });
+          }
+        }
+      }
+      return Array.from(new Set(result));
+    }catch(e){
+      console.warn('DB.loadOwnedBoards failed', e);
+      return [];
+    }
+  },
+
+  async fetchBoardMetadata(boardId){
+    if(!boardId || !window.firebase || typeof window.firebase.getDatabase !== 'function') return null;
+    try{
+      const db = window.firebase.getDatabase(window.firebase._app);
+      const hasDbUrl = window.firebase && window.firebase._app && window.firebase._app.options && window.firebase._app.options.databaseURL;
+      if(!db || !hasDbUrl) return null;
+      const ref = window.firebase.ref(db, `whiteboards_meta/${boardId}`);
+      const snap = await window.firebase.get(ref);
+      const exists = snap && typeof snap.exists === 'function' ? snap.exists() : !!snap;
+      if(!exists) return null;
+      const val = typeof snap.val === 'function' ? snap.val() : (snap && typeof snap.val !== 'undefined' ? snap.val : null);
+      if(val && typeof val === 'object' && !val.boardId){ val.boardId = boardId; }
+      return val;
+    }catch(e){
+      console.warn('DB.fetchBoardMetadata failed', e);
+      return null;
+    }
   }
 }
 
@@ -607,9 +744,27 @@ function boot(){
   if(window.firebase && typeof window.firebase.onAuthStateChanged === 'function'){
     try{
       const auth = window.firebase.getAuth(window.firebase._app);
-      window.firebase.onAuthStateChanged(auth, (u)=>{
-        if(u){ DB.user = u; DB.firebaseConfigured = true; hideSplash(); loadEvents(); try{ updateAuthUI(DB.user); }catch(e){} try{ if(window.Whiteboard && typeof window.Whiteboard.handleAuth === 'function'){ window.Whiteboard.handleAuth(u); } }catch(e){} }
-        else { DB.user = null; showSplash(); try{ updateAuthUI(null); }catch(e){} try{ if(window.Whiteboard && typeof window.Whiteboard.handleAuth === 'function'){ window.Whiteboard.handleAuth(null); } }catch(e){} }
+      window.firebase.onAuthStateChanged(auth, async (u)=>{
+        if(u){
+          DB.user = u;
+          DB.firebaseConfigured = true;
+          hideSplash();
+          loadEvents();
+          try{ updateAuthUI(DB.user); }catch(e){}
+          try{ if(window.Whiteboard && typeof window.Whiteboard.handleAuth === 'function'){ window.Whiteboard.handleAuth(u); } }catch(e){}
+          try{ await syncOwnedBoardsFromDb(true); }catch(err){ console.warn('Failed to sync owned whiteboards', err); }
+        } else {
+          DB.user = null;
+          showSplash();
+          try{ updateAuthUI(null); }catch(e){}
+          try{ if(window.Whiteboard && typeof window.Whiteboard.handleAuth === 'function'){ window.Whiteboard.handleAuth(null); } }catch(e){}
+          clearOwnedBoardState();
+          _wbList = [];
+          saveWbList();
+          renderWhiteboardList();
+          try{ if(window.Whiteboard && typeof window.Whiteboard.leave === 'function'){ window.Whiteboard.leave(); } }catch(_){ }
+          setWhiteboardUIFor(null);
+        }
       });
     }catch(e){ console.warn('Auth state listener failed', e); }
   }
@@ -747,8 +902,13 @@ function boot(){
         const code = codeEl.textContent;
         const last = boardLastActive.get(code);
         if(last){ const dt = new Date(last); small.title = dt.toLocaleString(); }
+        const meta = boardMetaCache.get(code);
+        if(!last && meta && meta.lastActive){
+          try{ boardLastActive.set(code, meta.lastActive); small.title = new Date(meta.lastActive).toLocaleString(); }catch(_){ }
+        }
         // Also update Active/Inactive label without full re-render
-        const isActive = isBoardActive(code) || ownerBoards.has(code);
+        const hasOwner = ownerBoards.has(code) || (meta && meta.ownerId);
+        const isActive = isBoardActive(code) || hasOwner;
         const info = ownerBoards.has(code) ? 'Owner' : (isActive ? 'Active' : 'Inactive');
         small.textContent = info;
       }
@@ -772,6 +932,8 @@ function boot(){
 
   // --- Ownership/Participants helpers (must be defined before used) ---
   const ownerBoards = new Set(); // codes I own
+  const boardMetaCache = new Map();
+  let ownedBoardsLoaded = false;
   const heartbeats = new Map(); // code -> intervalId
   let currentBoard = null; // currently joined code
   let boardChannel = null; // BroadcastChannel for current board traffic
@@ -780,6 +942,99 @@ function boot(){
   // Board stats storage (declare before first use)
   const boardWatchers = new Map(); // code -> unsubscribe function(s)
   const boardLastActive = new Map();
+
+  function normalizeBoardCode(code){
+    return (code || '').trim().toUpperCase();
+  }
+
+  function firebaseDbReady(){
+    try{
+      const fb = window.firebase;
+      return !!(fb && typeof fb.getDatabase === 'function' && fb._app && fb._app.options && fb._app.options.databaseURL);
+    }catch(_){ return false; }
+  }
+
+  function clearOwnedBoardState(){
+    ownerBoards.clear();
+    boardMetaCache.clear();
+    ownedBoardsLoaded = false;
+    boardLastActive.clear();
+  }
+
+  function mergeOwnedBoardsIntoList(codes){
+    if(!Array.isArray(codes) || !codes.length) return;
+    const seen = new Set();
+    const next = [];
+    codes.forEach((code)=>{
+      const normalized = normalizeBoardCode(code);
+      if(!normalized || seen.has(normalized)) return;
+      seen.add(normalized);
+      next.push(normalized);
+    });
+    _wbList.forEach((code)=>{
+      const normalized = normalizeBoardCode(code);
+      if(!normalized || seen.has(normalized)) return;
+      seen.add(normalized);
+      next.push(normalized);
+    });
+    if(next.length > 20) next.length = 20;
+    const changed = next.length !== _wbList.length || next.some((code, idx)=> _wbList[idx] !== code);
+    if(changed){
+      _wbList = next;
+      saveWbList();
+    }
+  }
+
+  function rememberBoardLocally(code){
+    const normalized = normalizeBoardCode(code);
+    if(!normalized) return;
+    if(!_wbList.includes(normalized)){
+      _wbList.unshift(normalized);
+      if(_wbList.length > 20) _wbList.length = 20;
+      saveWbList();
+    }
+  }
+
+  async function fetchBoardMetaCached(code){
+    const normalized = normalizeBoardCode(code);
+    if(!normalized) return null;
+    if(boardMetaCache.has(normalized)) return boardMetaCache.get(normalized);
+    if(!firebaseDbReady()) return null;
+    try{
+      const meta = await DB.fetchBoardMetadata(normalized);
+      if(meta){
+        boardMetaCache.set(normalized, meta);
+        if(meta.lastActive){ try{ boardLastActive.set(normalized, meta.lastActive); }catch(_){ } }
+      }
+      return meta || null;
+    }catch(e){
+      console.warn('Failed to fetch board metadata', e);
+      return null;
+    }
+  }
+
+  async function syncOwnedBoardsFromDb(force=false){
+    if(!DB.user || !firebaseDbReady()) return;
+    if(ownedBoardsLoaded && !force) return;
+    try{
+      const codes = await DB.loadOwnedBoards();
+      ownerBoards.clear();
+      if(Array.isArray(codes)){
+        codes.forEach((code)=>{
+          const normalized = normalizeBoardCode(code);
+          if(!normalized) return;
+          ownerBoards.add(normalized);
+          fetchBoardMetaCached(normalized).catch(()=>{});
+        });
+      }
+      mergeOwnedBoardsIntoList(Array.from(ownerBoards));
+    }catch(e){
+      console.warn('Failed to load owned whiteboards', e);
+    }finally{
+      ownedBoardsLoaded = true;
+      renderWhiteboardList();
+    }
+  }
 
   function generateBoardCode() {
     // Simple human-friendly 6-char code (A-Z0-9)
@@ -825,7 +1080,14 @@ function boot(){
 
   // Keep a simple in-memory list of boards for this demo (persisted per-session)
   let _wbList = JSON.parse(sessionStorage.getItem('studyflow:whiteboards') || '[]');
-  function saveWbList() { try { sessionStorage.setItem('studyflow:whiteboards', JSON.stringify(_wbList)); } catch(_){} }
+  _wbList = Array.from(new Set((_wbList || []).map(normalizeBoardCode).filter(Boolean)));
+  function saveWbList() {
+    try {
+      const unique = Array.from(new Set((_wbList || []).map(normalizeBoardCode).filter(Boolean)));
+      sessionStorage.setItem('studyflow:whiteboards', JSON.stringify(unique));
+      _wbList = unique;
+    } catch(_){ }
+  }
 
   function renderWhiteboardList() {
     const list = $('#whiteboardList');
@@ -834,82 +1096,138 @@ function boot(){
     if (!_wbList.length) {
       const empty = document.createElement('div');
       empty.className = 'whiteboard-empty-list';
-      empty.textContent = 'No boards yet — create one to get started';
+      empty.textContent = 'No boards yet - create one to get started';
       list.appendChild(empty);
       return;
     }
-    _wbList.forEach(code => {
+    const codes = Array.from(new Set(_wbList.map(normalizeBoardCode).filter(Boolean)));
+    codes.forEach(code => {
       const item = document.createElement('div');
-      const isActive = isBoardActive(code) || ownerBoards.has(code);
+      const meta = boardMetaCache.get(code);
+      if(!meta && firebaseDbReady()){
+        fetchBoardMetaCached(code).then((info)=>{ if(info) renderWhiteboardList(); }).catch(()=>{});
+      }
+      if(meta && DB.user && meta.ownerId === DB.user.uid){ ownerBoards.add(code); }
+      const hasOwner = ownerBoards.has(code) || (meta && meta.ownerId);
+      const isActive = isBoardActive(code) || hasOwner;
       item.className = 'whiteboard-item' + (currentBoard === code ? ' active' : '');
       const top = document.createElement('span');
       top.textContent = code;
       const sub = document.createElement('small');
-      const info = ownerBoards.has(code) ? 'Owner' : (isActive ? 'Active' : 'Inactive');
       const last = boardLastActive.get(code);
       if (last) {
-        const dt = new Date(last);
-        sub.title = dt.toLocaleString();
+        try{ sub.title = new Date(last).toLocaleString(); }catch(_){ }
+      } else if(meta && meta.updatedAt){
+        try{ sub.title = new Date(meta.updatedAt).toLocaleString(); }catch(_){ }
+        if(meta.lastActive){
+          try{ boardLastActive.set(code, meta.lastActive); }catch(_){ }
+        }
       }
+      const info = ownerBoards.has(code) ? 'Owner' : (isActive ? 'Active' : 'Inactive');
       sub.textContent = info;
       item.appendChild(top);
       item.appendChild(sub);
-      // Start watchers for stats
       ensureBoardWatcher(code);
-      item.onclick = () => {
-        // Allow joining even if owner heartbeat isn't detected (cross-device)
-        if (!isBoardActive(code) && !ownerBoards.has(code)) {
-          showToast('Owner not detected — joining anyway', 2000);
-        }
-        try { if (window.Whiteboard && typeof window.Whiteboard.join === 'function') { window.Whiteboard.join(code); setWhiteboardUIFor(code); renderWhiteboardList(); } } catch(e){}
-      };
+      item.onclick = () => { joinWhiteboardByCode(code).catch(()=>{}); };
       list.appendChild(item);
     });
-    // After (re)render, schedule one pass to ensure tooltips are up-to-date without thrashing
     scheduleSidebarStatsUpdate();
+  }
+  async function joinWhiteboardByCode(rawCode, options = {}) {
+    const code = normalizeBoardCode(rawCode);
+    if(!code){
+      if(!options.silent){ showToast('Enter a board code to join', 2000); }
+      return false;
+    }
+    if(!DB.user){
+      requestSignIn();
+      return false;
+    }
+    let meta = boardMetaCache.get(code);
+    if(!meta && firebaseDbReady()){
+      try{ meta = await fetchBoardMetaCached(code); }catch(err){ console.warn('Failed to fetch board metadata', err); }
+    }
+    if(firebaseDbReady() && !meta){
+      if(!options.silent){ showToast('Board not found', 2500); }
+      return false;
+    }
+    if(meta){
+      boardMetaCache.set(code, meta);
+      if(DB.user && meta.ownerId === DB.user.uid){ ownerBoards.add(code); }
+    }
+    rememberBoardLocally(code);
+    renderWhiteboardList();
+    try{
+      if(window.Whiteboard && typeof window.Whiteboard.join === 'function'){ window.Whiteboard.join(code); }
+      setWhiteboardUIFor(code);
+      const selfId = (DB.user && DB.user.uid) || myId;
+      const selfName = (DB.user && (DB.user.displayName||DB.user.email)) || 'You';
+      try{ upsertParticipant({ userId: selfId, name: selfName, color: '#2563eb', idle: false }); }catch(_){ }
+      try{ renderParticipants(); }catch(_){ }
+      if(options.toast !== false){
+        const msg = options.toastMessage || ('Joined board ' + code);
+        showToast(msg, 2000);
+      }
+    }catch(err){
+      console.warn('Join failed', err);
+      showToast('Failed to join board', 2000);
+      return false;
+    }
+    if(firebaseDbReady() && DB.user){
+      try{
+        if(ownerBoards.has(code)){
+          const updated = await DB.persistBoardOwnership(code);
+          if(updated){ boardMetaCache.set(code, updated); }
+        } else {
+          await DB.recordBoardMembership(code, 'member');
+          if(meta){
+            const members = Object.assign({}, meta.members || {});
+            members[DB.user.uid] = 'member';
+            boardMetaCache.set(code, Object.assign({}, meta, { members }));
+          }
+        }
+      }catch(err){ console.warn('Failed to sync board membership', err); }
+    }
+    if(ownerBoards.has(code)){
+      mergeOwnedBoardsIntoList(Array.from(ownerBoards));
+      renderWhiteboardList();
+    }
+    return true;
   }
 
   // New board
   const createBtn = $('#createWhiteboardBtn');
-  if (createBtn) createBtn.onclick = () => {
-    // Require sign-in to create board (consistent with app's data rules)
+  if (createBtn) createBtn.onclick = async () => {
     if (!DB.user) { requestSignIn(); return; }
-    const code = generateBoardCode();
-    // Add to list and persist
-    if (!_wbList.includes(code)) { _wbList.unshift(code); if (_wbList.length > 20) _wbList.length = 20; saveWbList(); }
+    const code = normalizeBoardCode(generateBoardCode());
+    ownerBoards.add(code);
+    rememberBoardLocally(code);
     renderWhiteboardList();
     try {
-      // Announce ownership and start heartbeat
       markAsOwner(code);
-      if (window.Whiteboard && typeof window.Whiteboard.join === 'function') {
-        window.Whiteboard.join(code);
-        setWhiteboardUIFor(code);
-        // Add self to participants immediately (UI)
-        upsertParticipant({ userId: myId, name: (DB.user && (DB.user.displayName||DB.user.email)) || 'You', color: '#2563eb', idle: false });
-        renderParticipants();
-        showToast('Created and joined board ' + code, 2500);
-      }
-    } catch(e){ console.warn('Failed to join new whiteboard', e); }
+    } catch(e){ console.warn('Failed to start owner heartbeat', e); }
+    if (firebaseDbReady()) {
+      try {
+        const meta = await DB.persistBoardOwnership(code);
+        if(meta){ boardMetaCache.set(code, meta); }
+      } catch(err) { console.warn('Failed to persist board ownership', err); }
+    }
+    const joined = await joinWhiteboardByCode(code, { toastMessage: 'Created and joined board ' + code });
+    if(!joined){
+      return;
+    }
+    if (firebaseDbReady()) {
+      try { await DB.recordBoardMembership(code, 'owner'); }catch(err){ console.warn('Failed to record owner membership', err); }
+    }
   };
 
   // Join by code
   const joinInput = $('#whiteboardJoinInput');
   const joinBtn = $('#joinWhiteboardBtn');
-  if (joinBtn && joinInput) joinBtn.onclick = () => {
-    const code = (joinInput.value || '').trim().toUpperCase();
-    if (!code) { showToast('Enter a board code to join', 2000); return; }
-    if (!DB.user) { requestSignIn(); return; }
-    const active = isBoardActive(code) || ownerBoards.has(code);
-    if (!active) { showToast('Owner not detected — joining anyway', 2000); }
-    if (!_wbList.includes(code)) { _wbList.unshift(code); saveWbList(); renderWhiteboardList(); }
-    try {
-      window.Whiteboard.join(code);
-      setWhiteboardUIFor(code);
-      // Add self to participants immediately (UI)
-      upsertParticipant({ userId: myId, name: (DB.user && (DB.user.displayName||DB.user.email)) || 'You', color: '#2563eb', idle: false });
-      renderParticipants();
-      showToast('Joined board ' + code, 2000);
-    } catch(e){ console.warn('Join failed', e); }
+  if (joinBtn && joinInput) joinBtn.onclick = async () => {
+    const code = joinInput.value || '';
+    const joined = await joinWhiteboardByCode(code);
+    if(joined){ joinInput.value = ''; }
   };
 
   // Leave
@@ -969,7 +1287,6 @@ function boot(){
 
   function stopHeartbeat(code, announceDestroy=false){
     const id = heartbeats.get(code); if(id){ clearInterval(id); heartbeats.delete(code); }
-    ownerBoards.delete(code);
     if(announceDestroy && registry){ try{ registry.postMessage({ type:'destroy', boardId: code, ownerId: myId, ts: Date.now() }); }catch(_){} }
   }
 

@@ -855,6 +855,7 @@
     dbBatch: [],
     dbFlushTimer: null,
     dbFlushIntervalMs: 140,
+    dbSeenNodes: new Set(),
     // UI bits
     loadingEl: null,
     loadingTimer: null,
@@ -1360,12 +1361,10 @@
   function attachFirebaseStrokeStream(boardId){
     if (!isFirebaseDbAvailable()) return;
     const db = getDb(); if (!db) return;
-    // Detach any prior
     detachFirebaseStrokeStream();
     const base = window.firebase.ref(db, `whiteboards/${boardId}/strokes`);
     state.dbRef = base;
-    const hasBC = (typeof BroadcastChannel === 'function');
-    // Load history first (one-time)
+    state.dbSeenNodes.clear();
     try{
       showHistoryLoading();
       window.firebase.get(base).then((snap)=>{
@@ -1375,7 +1374,9 @@
             const segsAll = [];
             data.forEach((child)=>{
               try{
-                const val = child && child.val ? child.val() : null;
+                const key = child && (child.key || (child.ref && child.ref.key));
+                if(key) state.dbSeenNodes.add(key);
+                const val = child && typeof child.val === 'function' ? child.val() : (child && child.val) ? child.val : null;
                 if (!val || (val.senderId && val.senderId === state.clientId)) return;
                 if (Array.isArray(val.segments)) segsAll.push(...val.segments);
               }catch(_){ }
@@ -1384,31 +1385,30 @@
           }
         }catch(_){ }
       }).catch((_err)=>{
-        // Likely permission_denied; disable DB writes to suppress spam
         state.dbWritesDisabled = true;
       }).finally(() => {
-        // Hide indicator regardless of success
         hideHistoryLoading();
       });
     }catch(_){ }
-    // If BroadcastChannel exists, rely on it for live; otherwise subscribe to DB live
-    if (!hasBC){
-      state.dbUnsubscribe = window.firebase.onChildAdded(base, (snap)=>{
-        try{
-          const val = snap && typeof snap.val === 'function' ? snap.val() : (snap && snap.val) ? snap.val : null;
-          if (!val) return;
-          if (val.senderId && val.senderId === state.clientId) return;
-          const segs = Array.isArray(val.segments) ? val.segments : [];
-          if (segs.length) handleRemoteStroke(segs);
-        }catch(e){ /* ignore draw errors */ }
-      });
-    }
+    state.dbUnsubscribe = window.firebase.onChildAdded(base, (snap)=>{
+      try{
+        const key = snap && (snap.key || (snap.ref && snap.ref.key));
+        if(key && state.dbSeenNodes.has(key)) return;
+        if(key) state.dbSeenNodes.add(key);
+        const val = snap && typeof snap.val === 'function' ? snap.val() : (snap && snap.val) ? snap.val : null;
+        if (!val) return;
+        if (val.senderId && val.senderId === state.clientId) return;
+        const segs = Array.isArray(val.segments) ? val.segments : [];
+        if (segs.length) handleRemoteStroke(segs);
+      }catch(e){ /* ignore draw errors */ }
+    });
   }
 
   function detachFirebaseStrokeStream(){
     try{
       if (state.dbUnsubscribe) { state.dbUnsubscribe(); state.dbUnsubscribe = null; }
       if (state.dbRef) { window.firebase.off(state.dbRef); state.dbRef = null; }
+      state.dbSeenNodes.clear();
       hideHistoryLoading();
     }catch(_){ /* noop */ }
   }
@@ -1423,6 +1423,10 @@
     try {
       const node = window.firebase.push(base);
       await window.firebase.set(node, payload);
+      try{
+        const metaRef = window.firebase.ref(db, `whiteboards_meta/${state.boardId}`);
+        await window.firebase.update(metaRef, { lastActive: Date.now(), updatedAt: Date.now() });
+      }catch(_){ }
     } catch (e) {
       // If write fails (offline/unconfigured), drop batch silently
       state.dbWritesDisabled = true;
@@ -1450,6 +1454,15 @@
       return;
     }
     state.boardId = boardId;
+    try{
+      if(isFirebaseDbAvailable()){
+        const dbLive = getDb();
+        if(dbLive){
+          const metaRef = window.firebase.ref(dbLive, `whiteboards_meta/${boardId}`);
+          window.firebase.update(metaRef, { lastActive: Date.now(), updatedAt: Date.now() }).catch(()=>{});
+        }
+      }
+    }catch(_){ }
     // New board starts with a blank canvas; history will load shortly
     clearCanvas();
     if (state.overlay) state.overlay.clearRemotes();
