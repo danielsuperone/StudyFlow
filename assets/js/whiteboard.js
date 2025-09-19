@@ -1424,8 +1424,10 @@
       const node = window.firebase.push(base);
       await window.firebase.set(node, payload);
       try{
-        const metaRef = window.firebase.ref(db, `whiteboards_meta/${state.boardId}`);
-        await window.firebase.update(metaRef, { lastActive: Date.now(), updatedAt: Date.now() });
+        if(!(window.DB && window.DB.whiteboardPersistDisabled)){
+          const metaRef = window.firebase.ref(db, `whiteboards_meta/${state.boardId}`);
+          await window.firebase.update(metaRef, { lastActive: Date.now(), updatedAt: Date.now() });
+        }
       }catch(_){ }
     } catch (e) {
       // If write fails (offline/unconfigured), drop batch silently
@@ -1455,7 +1457,7 @@
     }
     state.boardId = boardId;
     try{
-      if(isFirebaseDbAvailable()){
+      if(isFirebaseDbAvailable() && !(window.DB && window.DB.whiteboardPersistDisabled)){
         const dbLive = getDb();
         if(dbLive){
           const metaRef = window.firebase.ref(dbLive, `whiteboards_meta/${boardId}`);

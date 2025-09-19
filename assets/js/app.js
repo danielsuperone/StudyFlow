@@ -31,8 +31,14 @@ function requestSignIn(){
 }
 window.requestSignIn = requestSignIn;
 
+function isPermissionDeniedError(err){
+  if(!err) return false;
+  const code = (typeof err === 'string') ? err : (err.code || err.message || err.toString());
+  return typeof code === 'string' && code.toLowerCase().includes('permission_denied');
+}
+
 // -------- Data Layer --------
-const DB = { firebaseConfigured:false, user:null, warnedMissingDb:false,
+const DB = { firebaseConfigured:false, user:null, warnedMissingDb:false, whiteboardPersistDisabled:false,
   initFirebase(){
     try{
       if(window.firebase && typeof window.firebase.initializeApp === 'function'){
@@ -92,6 +98,16 @@ const DB = { firebaseConfigured:false, user:null, warnedMissingDb:false,
       localStorage.setItem('studyflow_events_unsaved', JSON.stringify(events));
     }
   },
+  },
+
+  markWhiteboardPersistenceDisabled(reason){
+    if(this.whiteboardPersistDisabled) return;
+    this.whiteboardPersistDisabled = true;
+    try{ console.info('Whiteboard persistence disabled; using local session storage instead.'); }catch(_){ }
+    if(reason){ try{ console.debug('Whiteboard persistence error:', reason); }catch(_){ } }
+    try{ showToast('Whiteboard sync unavailable; falling back to local mode for this session.', 4000); }catch(_){ }
+  },
+
   async load(){
     const uid = this.user && this.user.uid ? this.user.uid : null;
     const localKey = uid ? ('studyflow_events_' + uid) : 'studyflow_events_unsaved';
@@ -184,8 +200,12 @@ const DB = { firebaseConfigured:false, user:null, warnedMissingDb:false,
       }
       return merged;
     }catch(e){
+      if(isPermissionDeniedError(e)){
+        this.markWhiteboardPersistenceDisabled(e);
+        return existing || null;
+      }
       console.warn('DB.persistBoardOwnership failed', e);
-      return null;
+      return existing || null;
     }
   },
 
@@ -210,11 +230,13 @@ const DB = { firebaseConfigured:false, user:null, warnedMissingDb:false,
       updates[`whiteboards_meta/${boardId}/updatedAt`] = now;
       await window.firebase.update(window.firebase.ref(db, '/'), updates);
     }catch(e){
+      if(isPermissionDeniedError(e)){ this.markWhiteboardPersistenceDisabled(e); return; }
       console.warn('DB.recordBoardMembership failed', e);
     }
   },
 
   async loadOwnedBoards(){
+    if(this.whiteboardPersistDisabled) return [];
     if(!this.user || !window.firebase || typeof window.firebase.getDatabase !== 'function') return [];
     try{
       const db = window.firebase.getDatabase(window.firebase._app);
@@ -249,12 +271,14 @@ const DB = { firebaseConfigured:false, user:null, warnedMissingDb:false,
       }
       return Array.from(new Set(result));
     }catch(e){
+      if(isPermissionDeniedError(e)){ this.markWhiteboardPersistenceDisabled(e); return []; }
       console.warn('DB.loadOwnedBoards failed', e);
       return [];
     }
   },
 
   async fetchBoardMetadata(boardId){
+    if(this.whiteboardPersistDisabled) return null;
     if(!boardId || !window.firebase || typeof window.firebase.getDatabase !== 'function') return null;
     try{
       const db = window.firebase.getDatabase(window.firebase._app);
@@ -268,6 +292,7 @@ const DB = { firebaseConfigured:false, user:null, warnedMissingDb:false,
       if(val && typeof val === 'object' && !val.boardId){ val.boardId = boardId; }
       return val;
     }catch(e){
+      if(isPermissionDeniedError(e)){ this.markWhiteboardPersistenceDisabled(e); return null; }
       console.warn('DB.fetchBoardMetadata failed', e);
       return null;
     }
@@ -949,6 +974,7 @@ function boot(){
 
   function firebaseDbReady(){
     try{
+      if(DB.whiteboardPersistDisabled) return false;
       const fb = window.firebase;
       return !!(fb && typeof fb.getDatabase === 'function' && fb._app && fb._app.options && fb._app.options.databaseURL);
     }catch(_){ return false; }
@@ -1014,6 +1040,7 @@ function boot(){
   }
 
   async function syncOwnedBoardsFromDb(force=false){
+    if(DB.whiteboardPersistDisabled) return;
     if(!DB.user || !firebaseDbReady()) return;
     if(ownedBoardsLoaded && !force) return;
     try{
