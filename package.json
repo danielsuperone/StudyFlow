@@ -1,0 +1,9 @@
+{
+  "name": "portfolio-site",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Minimal package.json for static portfolio site to satisfy CI/build systems",
+  "scripts": {
+    "build": "echo \"No build step required for this static site\""
+  }
+}
