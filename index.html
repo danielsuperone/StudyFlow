@@ -1,0 +1,1239 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daniel - Portfolio</title>
+
+  <!--
+    - favicon
+  -->
+  <link rel="shortcut icon" href="./assets/images/logo.ico" type="image/x-icon">
+
+  <!--
+    - custom css link
+  -->
+  <link rel="stylesheet" href="./assets/css/style.css">
+
+  <!--
+    - google font link
+  -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+</head>
+
+<body>
+
+  <!--
+    - #MAIN
+  -->
+
+  <main>
+
+    <!--
+      - #SIDEBAR
+    -->
+
+    <aside class="sidebar" data-sidebar>
+
+      <div class="sidebar-info">
+
+        <figure class="avatar-box">
+          <img src="./assets/images/profile-photo.jpg" alt="Daniel Buttigieg" width="80">
+        </figure>
+
+        <div class="info-content">
+          <h1 class="name" title="Richard hanrick">Daniel Buttigieg</h1>
+
+          <p class="title">Programmer</p>
+        </div>
+
+        <button class="info_more-btn" data-sidebar-btn>
+          <span>Show Contacts</span>
+
+          <ion-icon name="chevron-down"></ion-icon>
+        </button>
+
+      </div>
+
+      <div class="sidebar-info_more">
+
+        <div class="separator"></div>
+
+        <ul class="contacts-list">
+
+          <li class="contact-item">
+
+            <div class="icon-box">
+              <ion-icon name="mail-outline"></ion-icon>
+            </div>
+
+            <div class="contact-info">
+              <p class="contact-title">Email</p>
+
+              <a href="mailto:daniel@danlabs.me" class="contact-link">Click here</a>
+            </div>
+
+          </li>
+
+          <li class="contact-item">
+
+            <div class="icon-box">
+              <ion-icon name="phone-portrait-outline"></ion-icon>
+            </div>
+
+            <div class="contact-info">
+              <p class="contact-title">Phone</p>
+
+              <a href="tel:+35611111111" class="contact-link">Use email instead</a>
+            </div>
+
+          </li>
+
+          <li class="contact-item">
+
+            <div class="icon-box">
+              <ion-icon name="calendar-outline"></ion-icon>
+            </div>
+
+            <div class="contact-info">
+              <p class="contact-title">Birthday</p>
+
+              <time datetime="1997-01-10">January 10<sup>th</sup> </time>
+            </div>
+
+          </li>
+
+          <li class="contact-item">
+
+            <div class="icon-box">
+              <ion-icon name="location-outline"></ion-icon>
+            </div>
+
+            <div class="contact-info">
+              <p class="contact-title">Location</p>
+
+              <address>Malta</address>
+            </div>
+
+          </li>
+
+        </ul>
+
+        <div class="separator"></div>
+
+        <ul class="social-list">
+
+          <li class="social-item">
+            <a href="https://github.com/danielsuperone" class="social-link">
+              <ion-icon name="logo-github"></ion-icon>
+            </a>
+          </li>
+
+          <li class="social-item">
+            <a href="https://discord.gg/q5tzV7h9x3" class="social-link">
+              <ion-icon name="logo-discord"></ion-icon>
+            </a>
+          </li>
+
+          <li class="social-item">
+            <a href="https://instagram.com/co_and_daniel" class="social-link">
+              <ion-icon name="logo-instagram"></ion-icon>
+            </a>
+          </li>
+
+        </ul>
+
+      </div>
+
+    </aside>
+
+
+
+
+
+    <!--
+      - #main-content
+    -->
+
+    <div class="main-content">
+
+      <!--
+        - #NAVBAR
+      -->
+
+      <nav class="navbar">
+
+        <ul class="navbar-list">
+
+          <li class="navbar-item">
+            <button class="navbar-link  active" data-nav-link>About</button>
+          </li>
+
+          <li class="navbar-item">
+            <button class="navbar-link" data-nav-link>Resume</button>
+          </li>
+
+          <li class="navbar-item">
+            <a class="navbar-link" href="https://danlabs.me" target="_blank" rel="noopener noreferrer">Portfolio</a>
+          </li>
+
+          <li class="navbar-item">
+            <button class="navbar-link" data-nav-link>Blog</button>
+          </li>
+
+          <li class="navbar-item">
+            <button class="navbar-link" data-nav-link>Contact</button>
+          </li>
+
+        </ul>
+
+      </nav>
+
+
+
+
+
+      <!--
+        - #ABOUT
+      -->
+
+      <article class="about  active" data-page="about">
+
+        <header>
+          <h2 class="h2 article-title">About me</h2>
+        </header>
+
+        <section class="about-text">
+          <p>
+            Technologist with 7+ years of hands on experience in electronics, 
+            fullstack development, cybersecurity, and hardware design. 
+            Specialising in building robust, production ready digital and physical systems. 
+            Known for solving complex problems with precision and delivering high quality solutions across hardware, 
+            software and networking domains.
+          </p>
+        </section>
+
+
+        <!--
+          - service
+        -->
+
+        <section class="service">
+
+          <h3 class="h3 service-title">What i'm doing</h3>
+
+          <ul class="service-list">
+
+            <li class="service-item">
+
+              <div class="service-icon-box">
+                <img src="./assets/images/icon-design.svg
+                " alt="design icon" width="40">
+              </div>
+
+              <div class="service-content-box">
+                <h4 class="h4 service-item-title">Web design</h4>
+
+                <p class="service-item-text">
+                  Modern and high-quality designs.
+                </p>
+              </div>
+
+            </li>
+
+            <li class="service-item">
+
+              <div class="service-icon-box">
+                <img src="./assets/images/icon-dev.svg" alt="Web development icon" width="40">
+              </div>
+
+              <div class="service-content-box">
+                <h4 class="h4 service-item-title">Web development</h4>
+
+                <p class="service-item-text">
+                  High-quality development of sites.
+                </p>
+              </div>
+
+            </li>
+
+            <li class="service-item">
+
+              <div class="service-icon-box">
+                <img src="./assets/images/icon-app.svg" alt="mobile app icon" width="40">
+              </div>
+
+              <div class="service-content-box">
+                <h4 class="h4 service-item-title">Desktop apps</h4>
+
+                <p class="service-item-text">
+                  Development of basic desktop applications.
+                </p>
+              </div>
+
+            </li>
+
+            <li class="service-item">
+ 
+              <div class="service-icon-box">
+                <img src="./assets/images/icon-photo.svg" alt="camera icon" width="40">
+              </div>
+
+              <div class="service-content-box">
+                <h4 class="h4 service-item-title">Photography</h4>
+
+                <p class="service-item-text">
+                  I make high-quality photos of any category at a high level.
+                </p>
+              </div>
+
+            </li>
+
+          </ul>
+
+        </section>
+
+
+        <!--
+          - testimonials
+        -->
+
+        <section class="testimonials">
+
+          <h3 class="h3 testimonials-title">Testimonials</h3>
+
+          <ul class="testimonials-list has-scrollbar">
+
+            <li class="testimonials-item">
+              <div class="content-card" data-testimonials-item>
+
+                <figure class="testimonials-avatar-box">
+                  <img src="./assets/images/avatar-1.png" alt="Daniel lewis" width="60" data-testimonials-avatar>
+                </figure>
+
+                <h4 class="h4 testimonials-item-title" data-testimonials-title>Attila K</h4>
+
+                <div class="testimonials-text" data-testimonials-text>
+                  <p>
+                    Daniel is good at doing complex programming and has some amazing projects, 
+                    he has really good commitment to things especially when it comes to programming, 
+                    if there is a setback in his code he commits his time to debug it, 
+                    he is fun to discuss things with, 
+                    he also takes advices into consideration and he is good at making plans on the go or beforehand.
+                  </p>
+                </div>
+
+              </div>
+            </li>
+
+            <li class="testimonials-item">
+              <div class="content-card" data-testimonials-item>
+
+                <figure class="testimonials-avatar-box">
+                  <img src="./assets/images/avatar-2.png" alt="Jessica miller" width="60" data-testimonials-avatar>
+                </figure>
+
+                <h4 class="h4 testimonials-item-title" data-testimonials-title>Jessica M</h4>
+
+                <div class="testimonials-text" data-testimonials-text>
+                  <p>
+                    Daniel was hired to help promote an event in Malta. We were very pleased with his work. He has a
+                    lot of experience
+                    and is very concerned about the needs of client.
+                  </p>
+                </div>
+
+              </div>
+            </li>
+
+            <li class="testimonials-item">
+              <div class="content-card" data-testimonials-item>
+
+                <figure class="testimonials-avatar-box">
+                  <img src="./assets/images/avatar-3.png" alt="Emily evans" width="60" data-testimonials-avatar>
+                </figure>
+
+                <h4 class="h4 testimonials-item-title" data-testimonials-title>Emily E</h4>
+
+                <div class="testimonials-text" data-testimonials-text>
+                  <p>
+                    When it comes to programming, Daniel's problem solving skills are second to none. 
+                    He approaches challenges with a clear mindset and always finds efficient, 
+                    elegant solutions that I can rely on. Would 100% recommend to anyone and buy his services again.
+                  </p>
+                </div>
+
+              </div>
+            </li>
+
+            <li class="testimonials-item">
+              <div class="content-card" data-testimonials-item>
+
+                <figure class="testimonials-avatar-box">
+                  <img src="./assets/images/avatar-4.png" alt="Henry william" width="60" data-testimonials-avatar>
+                </figure>
+
+                <h4 class="h4 testimonials-item-title" data-testimonials-title>Harry W</h4>
+
+                <div class="testimonials-text" data-testimonials-text>
+                  <p>
+                    I was impressed by Daniel's ability to explain complex technical 
+                    details in a way that non technical people could understand. 
+                    This made collaboration smooth and efficient, his custom PCB designs are also very precise, reliable, 
+                    and tailored to the needs of each project.
+                  </p>
+                </div>
+
+              </div>
+            </li>
+
+          </ul>
+
+        </section>
+
+
+        <!--
+          - testimonials modal
+        -->
+
+        <div class="modal-container" data-modal-container>
+
+          <div class="overlay" data-overlay></div>
+
+          <section class="testimonials-modal">
+
+            <button class="modal-close-btn" data-modal-close-btn>
+              <ion-icon name="close-outline"></ion-icon>
+            </button>
+
+            <div class="modal-img-wrapper">
+              <figure class="modal-avatar-box">
+                <img src="./assets/images/avatar-1.png" alt="Daniel lewis" width="80" data-modal-img>
+              </figure>
+
+              <img src="./assets/images/icon-quote.svg" alt="quote icon">
+            </div>
+
+            <div class="modal-content">
+
+              <h4 class="h3 modal-title" data-modal-title>Daniel lewis</h4>
+
+              <time datetime="2021-06-14">14 June, 2021</time>
+
+              <div data-modal-text>
+                <p>
+                  We had Daniel help us with a proect that required to design a custom PCB, program it's software which was already
+                  top of the line and met out expectations as required, however, he also offered us to promote the product on our
+                  behalf and he did wonders here aswell. He was able to leverage social media and gain clout efficiently whilst
+                  conveying our needs perfectly, would recomend!
+                </p>
+              </div>
+
+            </div>
+
+          </section>
+
+        </div>
+
+        <!--
+          - clients
+        -->
+
+<!--
+<section class="clients">
+
+  <h3 class="h3 clients-title">Clients</h3>
+
+  <ul class="clients-list has-scrollbar">
+
+    <li class="clients-item">
+      <a href="#">
+        <img src="./assets/images/" alt="client logo">
+      </a>
+    </li>
+
+    <li class="clients-item">
+      <a href="#">
+        <img src="./assets/images/" alt="client logo">
+      </a>
+    </li>
+
+    <li class="clients-item">
+      <a href="#">
+        <img src="./assets/images/" alt="client logo">
+      </a>
+    </li>
+
+    <li class="clients-item">
+      <a href="#">
+        <img src="./assets/images/" alt="client logo">
+      </a>
+    </li>
+
+    <li class="clients-item">
+      <a href="#">
+        <img src="./assets/images/" alt="client logo">
+      </a>
+    </li>
+
+    <li class="clients-item">
+      <a href="#">
+        <img src="./assets/images/" alt="client logo">
+      </a>
+    </li>
+
+  </ul>
+
+</section>
+-->
+
+
+
+      </article>
+
+              
+
+
+      
+      <!--
+        - #RESUME
+      -->
+
+      <article class="resume" data-page="resume">
+
+        <header>
+          <h2 class="h2 article-title">Resume</h2>
+        </header>
+
+        <section class="timeline">
+
+          <div class="title-wrapper">
+            <div class="icon-box">
+              <ion-icon name="book-outline"></ion-icon>
+            </div>
+
+            <h3 class="h3">Education</h3>
+          </div>
+
+          <ol class="timeline-list">
+
+            <li class="timeline-item">
+
+              <h4 class="h4 timeline-item-title">GCHSS</h4>
+
+              <span>2024 — 2026</span>
+
+              <p class="timeline-text">
+                College
+              </p>
+
+            </li>
+
+            <li class="timeline-item">
+
+              <h4 class="h4 timeline-item-title">San Anton School</h4>
+
+              <span>2008-2024</span>
+
+              <p class="timeline-text">
+                School
+              </p>
+
+            </li>
+
+          </ol>
+
+        </section>
+
+<section class="timeline">
+  <div class="title-wrapper">
+    <div class="icon-box">
+      <ion-icon name="book-outline"></ion-icon>
+    </div>
+    <h3 class="h3">Experience</h3>
+  </div>
+
+  <ol class="timeline-list">
+
+    <li class="timeline-item">
+      <h4 class="h4 timeline-item-title">Ongoing Projects & Innovation</h4>
+      <span>2025 — 2026</span>
+      <ul class="timeline-list-text">
+        <li><b>Gamebox</b> — Developed a collection of party games playable both online and in-person, featuring real-time multiplayer.</li>
+        <li><b>StudyFlow</b> — Timetable and Whiteboard website with AI integration utilising Google Sign-in option and real time database updates.</li>
+        <li><b>Gambl</b> — Built a web platform inspired by Stake.com with focus on gamification and user retention</li>
+        <li><b>Dashboard</b> — Designed and deployed a unified landing page serving as the central hub for all projects.</li>
+        <li><b>Portfolio</b> — Created and refined a personal portfolio showcasing technical skills and case studies.</li>
+        <li><b>Whiteboard</b> — Built a collaborative online platform for real-time drawing and project sharing (in progress).</li>
+        <li><b>AI & Automation</b> — Experimented with AI pipelines for visual data recognition, automation workflows, and data visualization using n8n and custom scripts.</li>
+        <li><b>Marketing Collaboration</b> — Assisted a digital marketing agency in designing promotional posters and campaign visuals for clients.</li>
+        <li><b>3D Design Freelancing</b> — Completed Fiverr gigs providing custom 3D room and interior visualizations, with positive client reviews.</li>
+        <li><b>Cybersecurity Challenge</b> — Participated in online Capture the Flag (CTF) competitions, solving real-world penetration testing and reverse-engineering problems.</li>
+        <li><b>Open Source Contribution</b> — Contributed bug fixes and documentation improvements to community-driven GitHub projects.</li>
+        <li><b>UI/UX Prototyping</b> — Designed interactive app prototypes in Figma, focusing on user flow and intuitive design for web and mobile platforms.</li>
+        <li><b>Automation Bot</b> — Created a PWA website that has automation systems to streamline project notifications and task tracking to better manage ongoing tasks/projects</li>
+      
+      </ul>
+    </li>
+
+    <li class="timeline-item">
+      <h4 class="h4 timeline-item-title">Embedded Systems & Product Design</h4>
+      <span>2024 — 2025</span>
+      <ul class="timeline-list-text">
+        <li>Designed, assembled, and sold a modular ESP32-based PCB product (achieved 60–85% profit margin across multiple sales).</li>
+        <li>Built systems with OLED displays, RF modules, and magnetically connected I/O for modular prototyping.</li>
+        <li>Created a custom Minecraft client with enhanced visual cosmetic features and modding support.</li>
+        <li>Refined soldering, PCB layout, and manufacturing processes to production-ready standards.</li>
+        <li>Provided consulting in hardware/audio while coordinating part imports and supply chain sourcing from China.</li>
+      </ul>
+    </li>
+
+    <li class="timeline-item">
+      <h4 class="h4 timeline-item-title">Web Development, Infrastructure & Servers</h4>
+      <span>2022 — 2023</span>
+      <ul class="timeline-list-text">
+        <li>Built a full-stack marketplace using PHP, MySQL, and secure authentication with hashed logins and image storage.</li>
+        <li>Managed a self-hosted Docker server running Pi-hole, Minecraft, NAS, and automation services.</li>
+        <li>Launched and moderated a public Minecraft server with plugins and custom game modes for active players.</li>
+        <li>Developed a C++ GUI calculator featuring user authentication, persistent session tracking, and usage history.</li>
+      </ul>
+    </li>
+
+    <li class="timeline-item">
+      <h4 class="h4 timeline-item-title">Cybersecurity, Scripting & Bot Development</h4>
+      <span>2020 — 2021</span>
+      <ul class="timeline-list-text">
+        <li>Practiced ethical hacking and penetration testing with Kali Linux, Aircrack-ng, Nmap, and Wireshark.</li>
+        <li>Reverse-engineered scam centers using VOIP and RDP access for fraud exposure and reporting.</li>
+        <li>Created C# Discord bots with third-party API integrations (music streaming, live game data, utilities).</li>
+        <li>Discovered and disclosed a Discord token vulnerability (later patched by the platform).</li>
+      </ul>
+    </li>
+
+    <li class="timeline-item">
+      <h4 class="h4 timeline-item-title">Foundations & Early Hardware</h4>
+      <span>2018 — 2020</span>
+      <ul class="timeline-list-text">
+        <li>Built and sold custom gaming and office PCs for local clients.</li>
+        <li>Learned and applied fundamental electronics, computing, and troubleshooting skills.</li>
+        <li>Launched first web projects using HTML/CSS for small personal and client sites.</li>
+        <li>Provided peer-to-peer consulting for audio setups, PC builds, and online communities.</li>
+      </ul>
+    </li>
+
+  </ol>
+</section>
+
+
+
+        <section class="skill">
+
+            <div class="title-wrapper">
+              <div class="icon-box">
+                <ion-icon name="pencil-outline"></ion-icon>
+              </div>
+              <h3 class="h3">Experiences</h3>
+           </div>
+
+          <ul class="skills-list content-card">
+
+            <li class="skills-item">
+
+              <div class="title-wrapper">
+                <h5 class="h5">Web design [HTML/CSS]</h5>
+                <data value="85">85%</data>
+              </div>
+
+              <div class="skill-progress-bg">
+                <div class="skill-progress-fill" style="width: 85%;"></div>
+              </div>
+
+            </li>
+
+            <li class="skills-item">
+
+              <div class="title-wrapper">
+                <h5 class="h5">PCB design [KiCad]</h5>
+                <data value="80">80%</data>
+              </div>
+
+              <div class="skill-progress-bg">
+                <div class="skill-progress-fill" style="width: 80%;"></div>
+              </div>
+
+            </li>
+
+            <li class="skills-item">
+
+              <div class="title-wrapper">
+                <h5 class="h5">Soldering [Hardware]</h5>
+                <data value="95">95%</data>
+              </div>
+
+              <div class="skill-progress-bg">
+                <div class="skill-progress-fill" style="width: 95%;"></div>
+              </div>
+
+            </li>
+
+            <li class="skills-item">
+
+              <div class="title-wrapper">
+                <h5 class="h5">Java [VS]</h5>
+                <data value="60">60%</data>
+              </div>
+
+              <div class="skill-progress-bg">
+                <div class="skill-progress-fill" style="width: 60%;"></div>
+              </div>
+
+            </li>
+            <li class="skills-item">
+
+              <div class="title-wrapper">
+                <h5 class="h5">C# [VS]</h5>
+                <data value="65">65%</data>
+              </div>
+
+              <div class="skill-progress-bg">
+                <div class="skill-progress-fill" style="width: 65%;"></div>
+              </div>
+
+            </li>
+            <li class="skills-item">
+
+                        <li class="skills-item">
+
+              <div class="title-wrapper">
+                <h5 class="h5">Backend Development [Database, Hosting, Server Management]</h5>
+                <data value="70">70%</data>
+              </div>
+
+              <div class="skill-progress-bg">
+                <div class="skill-progress-fill" style="width: 70%;"></div>
+              </div>
+
+            </li>
+            <li class="skills-item">
+
+              <div class="title-wrapper">
+                <h5 class="h5">3D Design [Blender]</h5>
+                <data value="60">60%</data>
+              </div>
+
+              <div class="skill-progress-bg">
+                <div class="skill-progress-fill" style="width: 60%;"></div>
+              </div>
+
+            </li>
+            <li class="skills-item">
+
+              <div class="title-wrapper">
+                <h5 class="h5">Photoshop [PS]</h5>
+                <data value="95">95%</data>
+              </div>
+
+              <div class="skill-progress-bg">
+                <div class="skill-progress-fill" style="width: 95%;"></div>
+              </div>
+
+            </li>
+                        <li class="skills-item">
+
+              <div class="title-wrapper">
+                <h5 class="h5">Video Editing [PR]</h5>
+                <data value="80">80%</data>
+              </div>
+
+              <div class="skill-progress-bg">
+                <div class="skill-progress-fill" style="width: 80%;"></div>
+              </div>
+
+            </li>
+                        </li>
+                        <li class="skills-item">
+
+              <div class="title-wrapper">
+                <h5 class="h5">Audio Engineering [FL Studio]</h5>
+                <data value="70">70%</data>
+              </div>
+
+              <div class="skill-progress-bg">
+                <div class="skill-progress-fill" style="width: 70%;"></div>
+              </div>
+
+            </li>
+
+          </ul>
+
+        </section> <div style="height: 30px;"></div> <section class="skill"> 
+          
+            <div class="title-wrapper">
+              <div class="icon-box">
+                <ion-icon name="globe-outline"></ion-icon>
+              </div>
+              <h3 class="h3">Languages</h3>
+           </div>
+
+          <ul class="skills-list content-card">
+
+            <li class="skills-item">
+
+              <div class="title-wrapper">
+                <h5 class="h5">English</h5>
+                <data value="100">100%</data>
+              </div>
+
+              <div class="skill-progress-bg">
+                <div class="skill-progress-fill" style="width: 100%;"></div>
+              </div>
+
+            </li>
+
+            <li class="skills-item">
+
+              <div class="title-wrapper">
+                <h5 class="h5">Russian</h5>
+                <data value="90">90%</data>
+              </div>
+
+              <div class="skill-progress-bg">
+                <div class="skill-progress-fill" style="width: 90%;"></div>
+              </div>
+
+            </li>
+            
+            <li class="skills-item">
+
+              <div class="title-wrapper">
+                <h5 class="h5">Ukranian</h5>
+                <data value="85">85%</data>
+              </div>
+
+              <div class="skill-progress-bg">
+                <div class="skill-progress-fill" style="width: 85%;"></div>
+              </div>
+
+            </li>
+
+
+            <li class="skills-item">
+
+              <div class="title-wrapper">
+                <h5 class="h5">Maltese</h5>
+                <data value="75">75%</data>
+              </div>
+
+              <div class="skill-progress-bg">
+                <div class="skill-progress-fill" style="width: 75%;"></div>
+              </div>
+
+            </li>
+                        <li class="skills-item">
+
+              <div class="title-wrapper">
+                <h5 class="h5">Italian</h5>
+                <data value="45">45%</data>
+              </div>
+
+              <div class="skill-progress-bg">
+                <div class="skill-progress-fill" style="width: 45%;"></div>
+              </div>
+
+            </li>
+          </ul>
+
+        </section>
+
+      </article>
+
+
+
+
+
+      <!--
+        - #PORTFOLIO
+      -->
+
+      <article class="portfolio" data-page="portfolio">
+
+        <header>
+          <h2 class="h2 article-title">Portfolio</h2>
+        </header>
+
+        <section class="projects">
+
+          <ul class="filter-list">
+
+            <li class="filter-item">
+              <button class="active" data-filter-btn>All</button>
+            </li>
+
+            <li class="filter-item">
+              <button data-filter-btn>Web design</button>
+            </li>
+
+            <li class="filter-item">
+              <button data-filter-btn>Applications</button>
+            </li>
+
+            <li class="filter-item">
+              <button data-filter-btn>Web development</button>
+            </li>
+
+            <li class="filter-item">
+              <button data-filter-btn id="photography-btn">Photography</button>
+           </li>
+
+
+          </ul>
+
+          <div class="filter-select-box">
+
+            <button class="filter-select" data-select>
+
+              <div class="select-value" data-selecct-value>Select category</div>
+
+              <div class="select-icon">
+                <ion-icon name="chevron-down"></ion-icon>
+              </div>
+
+            </button>
+
+            <ul class="select-list">
+
+              <li class="select-item">
+                <button data-select-item>All</button>
+              </li>
+
+              <li class="select-item">
+                <button data-select-item>Web Design</button>
+              </li>
+
+              <li class="select-item">
+                <button data-select-item>Applications</button>
+              </li>
+
+              <li class="select-item">
+                <button data-select-item>Web Development</button>
+              </li>
+
+            </ul>
+
+          </div>
+
+          <ul class="project-list">
+
+            <li class="project-item  active" data-filter-item data-category="applications">
+              <a href="https://github.com/danielsuperone/CalculateV1">
+
+                <figure class="project-img">
+                  <div class="project-item-icon-box">
+                    <ion-icon name="eye-outline"></ion-icon>
+                  </div>
+
+                  <img src="./assets/images/calculator.png" alt="Calculator" loading="lazy">
+                </figure>
+
+                <h3 class="project-title">Calculator</h3>
+
+                <p class="project-category">Applications</p>
+
+              </a>
+            </li>
+
+            <li class="project-item  active" data-filter-item data-category="applications">
+              <a href="#">
+
+                <figure class="project-img">
+                  <div class="project-item-icon-box">
+                    <ion-icon name="eye-outline"></ion-icon>
+                  </div>
+
+                  <img src="./assets/images/project-8.jpg" alt="task manager" loading="lazy">
+                </figure>
+
+                <h3 class="project-title">Task Manager</h3>
+
+                <p class="project-category">Applications</p>
+                <p class="project-category">[NOT RELEASED]</p>
+
+              </a>
+            </li>
+
+            <li class="project-item  active" data-filter-item data-category="web design">
+              <a href="https://github.com/danielsuperone/BarberWebsiteV2">
+
+                <figure class="project-img">
+                  <div class="project-item-icon-box">
+                    <ion-icon name="eye-outline"></ion-icon>
+                  </div>
+
+                  <img src="./assets/images/barber-temp.png" alt="task manager" loading="lazy">
+                </figure>
+
+                <h3 class="project-title">Barber Website</h3>
+
+                <p class="project-category">Web Design</p>
+
+              </a>
+            </li>
+
+            <li class="project-item locked active" data-filter-item data-category="photography">
+                <a href="#">
+                  <figure class="project-img">
+                    <div class="project-item-icon-box">
+                      <ion-icon name="eye-outline"></ion-icon>
+                    </div>
+                    <img src="./assets/images/barber-temp.png" alt="Photography" loading="lazy">
+                  </figure>
+                  <h3 class="project-title">Hidden Gallery</h3>
+                  <p class="project-category">Photography</p>
+                </a>
+              </li>
+
+
+
+
+
+          </ul>
+
+        </section>
+
+      </article>
+
+
+
+
+
+      <!--
+        - #BLOG
+      -->
+
+      <article class="blog" data-page="blog">
+
+        <header>
+          <h2 class="h2 article-title">Blog</h2>
+        </header>
+
+        <section class="blog-posts">
+
+          <ul class="blog-posts-list">
+
+            <li class="blog-post-item">
+              <a href="https://github.com/danielsuperone">
+
+                <figure class="blog-banner-box">
+                  <img src="./assets/images/github-3d.jpeg" alt="Github 3D logo" loading="lazy">
+                </figure>
+
+                <div class="blog-content">
+
+                  <div class="blog-meta">
+                    <p class="blog-category">Programming</p>
+
+                    <span class="dot"></span>
+
+                    <time datetime="2019 - present">2018-present</time>
+                  </div>
+
+                  <h3 class="h3 blog-item-title">Design conferences in 2022</h3>
+
+                  <p class="blog-text">
+                    Github - housing a few of my projects made open source.
+                  </p>
+
+                </div>
+
+              </a>
+            </li>
+
+          </ul>
+
+        </section>
+
+      </article>
+
+
+
+
+
+      <!--
+        - #CONTACT
+      -->
+
+      <article class="contact" data-page="contact">
+
+        <header>
+          <h2 class="h2 article-title">Contact</h2>
+        </header>
+
+        <section class="mapbox" data-mapbox>
+          <figure>
+            <iframe
+              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d256823.76378386133!2d14.213543513308496!3d35.93503802054964!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x130e45281d8647c5%3A0xf582d86136be4239!2sMalta!5e1!3m2!1sen!2smt!4v1750677044062!5m2!1sen!2smt"
+              width="400" height="300" loading="lazy"></iframe>
+          </figure>
+        </section>
+
+        <section class="contact-form">
+
+          <h3 class="h3 form-title">Contact Form</h3>
+
+          <form action="#" class="form" data-form>
+
+            <div class="input-wrapper">
+              <input type="text" name="fullname" class="form-input" placeholder="Full name" required data-form-input>
+
+              <input type="email" name="email" class="form-input" placeholder="Email address" required data-form-input>
+            </div>
+
+            <textarea name="message" class="form-input" placeholder="Your Message" required data-form-input></textarea>
+
+            <button class="form-btn" type="submit" disabled data-form-btn>
+              <ion-icon name="paper-plane"></ion-icon>
+              <span>Send Message</span>
+            </button>
+
+          </form>
+
+        </section>
+
+      </article>
+
+    </div>
+
+  </main>
+
+
+
+
+
+
+  <!--
+    - custom js link
+  -->
+  <script src="./assets/js/script.js"></script>
+
+  <!--
+    - ionicon link
+  -->
+  <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
+  <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
+
+ <!--
+    - Special Access Page
+  -->
+
+  <div id="access-code-modal" class="modal hidden" hidden>
+  <div class="modal-content">
+    <h3>Enter Access Code</h3>
+    <div id="code-display">____</div>
+    <div class="numpad">
+      <!-- Number pad -->
+      <button class="num-btn">1</button>
+      <button class="num-btn">2</button>
+      <button class="num-btn">3</button>
+      <button class="num-btn">4</button>
+      <button class="num-btn">5</button>
+      <button class="num-btn">6</button>
+      <button class="num-btn">7</button>
+      <button class="num-btn">8</button>
+      <button class="num-btn">9</button>
+      <button id="clear-btn">Clear</button>
+      <button class="num-btn">0</button>
+      <button id="submit-btn">Enter</button>
+    </div>
+  </div>
+</div>
+<script>
+  const photographyBtn = document.getElementById('photography-btn');
+  const modal = document.getElementById('access-code-modal');
+  const codeDisplay = document.getElementById('code-display');
+  const numButtons = document.querySelectorAll('.num-btn');
+  const clearBtn = document.getElementById('clear-btn');
+  const submitBtn = document.getElementById('submit-btn');
+
+  let enteredCode = '';
+  const correctCode = '0000';
+
+  // Prevent Photography filter unless access code is correct
+  photographyBtn.addEventListener('click', (e) => {
+    if (!photographyBtn.dataset.verified) {
+      e.preventDefault(); // Stop default filtering
+      enteredCode = '';
+      updateDisplay();
+      // Use HTML hidden property to ensure modal stays hidden by default
+      modal.hidden = false;
+    }
+  });
+
+  // Update code input UI
+  function updateDisplay() {
+    codeDisplay.textContent = enteredCode.padEnd(4, '_');
+  }
+
+  // Handle number input
+  numButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (enteredCode.length < 4) {
+        enteredCode += btn.textContent;
+        updateDisplay();
+      }
+    });
+  });
+
+  // Clear button
+  clearBtn.addEventListener('click', () => {
+    enteredCode = '';
+    updateDisplay();
+  });
+
+  // Submit button
+submitBtn.addEventListener('click', () => {
+  if (enteredCode === correctCode) {
+    photographyBtn.dataset.verified = 'true';
+    // hide modal using HTML hidden property
+    modal.hidden = true;
+
+    // Show photography items
+    document.querySelectorAll('[data-category="photography"]').forEach(item => {
+      item.style.display = 'block'; // Show it
+    });
+
+    // Manually filter for photography
+    document.querySelectorAll('[data-filter-item]').forEach(item => {
+      const category = item.getAttribute('data-category').toLowerCase();
+      if (category === 'photography') {
+        item.classList.add('active');
+      } else {
+        item.classList.remove('active');
+      }
+    });
+
+    // Set active button styling
+    document.querySelectorAll('[data-filter-btn]').forEach(btn => {
+      btn.classList.remove('active');
+    });
+    photographyBtn.classList.add('active');
+
+  } else {
+    alert('Incorrect code');
+    enteredCode = '';
+    updateDisplay();
+  }
+
+  document.querySelectorAll('[data-category="photography"]').forEach(item => {
+  item.classList.remove('locked');
+});
+});
+</script>
+
+
+</body>
+
+</html>
