@@ -1,0 +1,11 @@
+{
+  "name": "studyflow-webapp",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "write-config": "node scripts/write-firebase-config.js",
+    "build": "npm run write-config && echo 'No build step configured. If you build static assets please replace this with your build command.'",
+    "test:whiteboard": "node tests/whiteboard.test.js",
+    "test": "npm run test:whiteboard"
+  }
+}

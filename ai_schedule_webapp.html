@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="mint">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>StudyFlow — AI Schedule Manager</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.3/firebase-database.js"></script>
+  <style>
+    :root {
+      --radius: 16px; --shadow: 0 10px 30px rgba(0,0,0,0.08);
+      --bg: #f7faf8; --card: #ffffff; --text: #0f172a; --muted: #6b7280;
+      --brand: #62c39e; --brand-strong: #31a67e; --accent: #2c7a7b; --border: rgba(15,23,42,0.08);
+      --grid-header: #d9f2e6; --chip-bg: #ecfdf5; --current: #bbf7d0;
+    }
+    html[data-theme="blue"]{ --bg:#f6fbff; --text:#0b1220; --muted:#61708a; --brand:#86bff7; --brand-strong:#4a9cf0; --accent:#2563eb; --grid-header:#dfeeff; --chip-bg:#eef6ff; --current:#dbeafe; }
+    html[data-theme="pink"]{ --bg:#fff8fb; --text:#24121d; --muted:#7a5466; --brand:#f3a9c4; --brand-strong:#e978a5; --accent:#c0265c; --grid-header:#ffe3ef; --chip-bg:#fff0f6; --current:#ffe4ef; }
+    html[data-theme="dark"]{ --bg:#0b0f14; --card:#121821; --text:#e5e7eb; --muted:#a1aab8; --brand:#4ade80; --brand-strong:#22c55e; --accent:#22c55e; --border:rgba(229,231,235,0.08); --grid-header:#0e1b14; --chip-bg:#0f1a13; --current:#052e1a; }
+
+    *{ box-sizing:border-box }
+    body{ margin:0; font-family:Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:var(--bg); color:var(--text) }
+
+    /* Layout */
+    .app{ display:grid; grid-template-columns: 280px 1fr; min-height:100vh }
+    body.sidebar-collapsed .app{ grid-template-columns: 72px 1fr }
+    @media (max-width: 960px){ .app{ grid-template-columns: 1fr } }
+
+    .sidebar{ position:sticky; top:0; align-self:start; height:100vh; padding:24px; border-right:1px solid var(--border); background:linear-gradient(180deg, rgba(255,255,255,0.7), rgba(255,255,255,0.4)); backdrop-filter: blur(10px); transition: width .25s ease }
+    body.sidebar-collapsed .sidebar .label{ display:none }
+    body.sidebar-collapsed .sidebar{ width:72px; padding:16px }
+    @media (max-width: 960px){ .sidebar{ position:fixed; inset:0 auto 0 0; transform:translateX(-110%); transition:.25s ease; z-index:20 } .sidebar.open{ transform:translateX(0) } }
+
+    .brand{ display:flex; align-items:center; gap:12px; font-weight:700; font-size:20px }
+    .brand .logo{ display:grid; place-items:center; width:36px; height:36px; border-radius:10px; background:var(--brand); color:#fff; box-shadow:var(--shadow) }
+
+    .nav{ margin-top:24px; display:flex; flex-direction:column; gap:8px }
+    .nav button{ display:flex; align-items:center; gap:12px; padding:12px 14px; border-radius:12px; border:1px solid var(--border); background:transparent; color:var(--text); cursor:pointer; transition:.2s ease; font-weight:600 }
+    .nav button:hover, .nav button.active{ background:var(--card); box-shadow:var(--shadow) }
+
+    .topbar{ position:sticky; top:0; z-index:11; display:flex; align-items:center; justify-content:space-between; padding:16px 24px; border-bottom:1px solid var(--border); background:linear-gradient(180deg, rgba(255,255,255,0.8), rgba(255,255,255,0.5)); backdrop-filter: blur(8px) }
+    .topbar-left{ display:flex; align-items:center; gap:12px }
+    .segmented{ display:flex; background:var(--card); border:1px solid var(--border); border-radius:12px; padding:4px }
+    .segmented button{ border:none; background:transparent; padding:8px 12px; border-radius:10px; font-weight:600; cursor:pointer; color:var(--muted) }
+    .segmented button.active{ background:var(--brand); color:#fff }
+
+    .profile{ position:relative; display:flex; align-items:center; gap:12px }
+    .avatar{ width:36px; height:36px; border-radius:50%; background:var(--brand); display:grid; place-items:center; color:#fff; font-weight:700 }
+    .menu{ position:absolute; right:0; top:48px; width:240px; background:var(--card); border:1px solid var(--border); border-radius:12px; box-shadow:var(--shadow); display:none }
+    .menu.open{ display:block }
+    .menu .group{ padding:8px; border-bottom:1px dashed var(--border) }
+    .menu .group:last-child{ border-bottom:none }
+    .menu button, .menu select{ width:100%; text-align:left; padding:10px 12px; border-radius:10px; border:1px solid var(--border); background:transparent; color:var(--text); font-weight:600; margin:4px 0; cursor:pointer }
+
+    .content{ display:grid; grid-template-rows:auto 1fr }
+    .page{ padding:24px; display:none }
+    .page.active{ display:block }
+
+    .card{ background:var(--card); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:16px }
+    .grid{ display:grid; gap:16px }
+
+    /* Weekly timetable */
+    .timetable{ display:grid; gap:12px }
+    .week-grid{ display:grid; grid-template-columns: 80px repeat(7, 1fr); }
+    .scroll-x{ overflow-x:auto; -webkit-overflow-scrolling:touch }
+    .scroll-x .week-grid, .scroll-x .month-grid{ min-width: 900px }
+    .col-head{ padding:10px; font-weight:700; text-align:center; background:var(--grid-header); border-radius:12px }
+    .col-head.current{ outline:2px solid var(--current) }
+    .time-col{ display:grid; grid-auto-rows: 56px; gap:8px }
+    .day-col{ display:grid; grid-auto-rows: 56px; gap:8px }
+    .slot{ position:relative; border:1px dashed var(--border); border-radius:12px; background: linear-gradient(180deg, transparent 55%, rgba(0,0,0,0.03) 56% 57%, transparent 58%) }
+    .slot.addable:hover{ outline:2px dashed var(--brand); cursor:pointer }
+    .event-chip{ position:absolute; inset:4px; padding:10px; border-radius:12px; color:#0b0f14; background:var(--chip-bg); font-weight:600; display:flex; align-items:center; justify-content:space-between; gap:8px; box-shadow:0 6px 14px rgba(0,0,0,.06) }
+    html[data-theme="dark"] .event-chip{ color:#e5e7eb }
+    .event-chip .meta{ font-size:12px; color:var(--muted); font-weight:600 }
+    .icon-btn{ display:inline-grid; place-items:center; width:28px; height:28px; border-radius:8px; border:1px solid var(--border); background:transparent; cursor:pointer }
+
+    /* Monthly calendar */
+    .month-grid{ display:grid; grid-template-columns: repeat(7, 1fr); gap:10px }
+    .day{ border:1px solid var(--border); border-radius:12px; padding:10px; min-height: 120px; background:var(--card); display:flex; flex-direction:column; gap:8px }
+    .day header{ display:flex; align-items:center; justify-content:space-between; font-weight:700 }
+    .pill{ display:inline-flex; align-items:center; gap:6px; border-radius:999px; padding:6px 10px; background:var(--chip-bg); font-size:12px; font-weight:700 }
+
+    /* Ask AI */
+    .ai-box{ display:grid; gap:12px }
+    textarea{ width:100%; min-height:110px; resize:vertical; border-radius:12px; border:1px solid var(--border); padding:12px; background:var(--card); color:var(--text) }
+    .btn{ display:inline-flex; gap:8px; align-items:center; padding:10px 14px; border-radius:12px; border:1px solid var(--border); background:var(--brand); color:#fff; font-weight:700; cursor:pointer }
+    .btn.secondary{ background:transparent; color:var(--text) }
+    .btn.ghost{ background:transparent; border-color:var(--border); color:var(--text) }
+
+    /* Modal */
+    .modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,0.35); display:none; place-items:center; z-index:100 }
+    .modal-backdrop.open{ display:grid }
+    .modal{ width:min(520px, 92vw); background:var(--card); border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow); padding:16px }
+    .modal h3{ margin:0 0 8px 0 }
+    .row{ display:grid; grid-template-columns:1fr 1fr; gap:10px }
+    .row .full{ grid-column:1 / -1 }
+    label{ font-size:12px; font-weight:700; color:var(--muted); display:block; margin-bottom:6px }
+    input, select{ width:100%; padding:10px; border-radius:10px; border:1px solid var(--border); background:var(--card); color:var(--text) }
+
+    /* Auth bar */
+    .auth{ display:flex; gap:10px; align-items:center; flex-wrap:wrap }
+    .auth input{ max-width:180px }
+
+    /* Mobile adjustments */
+    @media (max-width: 960px){
+      .topbar{ position:sticky; top:0 }
+      .time-col, .day-col{ grid-auto-rows: 52px }
+    }
+    @media (max-width: 420px){
+      .time-col, .day-col{ grid-auto-rows: 46px }
+      .btn{ padding:8px 10px }
+      .segmented button{ padding:6px 10px }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="brand"><div class="logo">SF</div> <span class="label">StudyFlow</span></div>
+      <div class="nav" id="nav">
+        <button data-nav="home" class="active"><i data-lucide="home"></i> <span class="label">Homepage</span></button>
+        <button data-nav="calendar"><i data-lucide="calendar"></i> <span class="label">Calendar</span></button>
+        <button data-nav="ask"><i data-lucide="bot"></i> <span class="label">Ask AI</span></button>
+      </div>
+      <div style="margin-top:auto" class="card">
+        <div style="font-weight:700; margin-bottom:8px">Quick Tips</div>
+        <div style="color:var(--muted); font-size:13px">Calendar is the only editable view. Tap/Click a slot or day to add a lesson. Delete via the bin icon. Recurring = weekly.</div>
+      </div>
+    </aside>
+
+    <!-- Main content -->
+    <div class="content">
+      <div class="topbar">
+        <div class="topbar-left">
+          <button class="icon-btn" id="toggleSidebar" aria-label="Toggle menu"><i data-lucide="panel-left"></i></button>
+          <div class="segmented" id="viewToggle">
+            <button data-view="weekly" class="active">Weekly</button>
+            <button data-view="monthly">Monthly</button>
+          </div>
+        </div>
+        <div class="auth" id="authBar">
+          <input id="email" placeholder="email" />
+          <input id="password" placeholder="password" type="password" />
+          <button class="btn secondary" id="signinBtn">Sign in</button>
+          <button class="btn ghost" id="signoutBtn" style="display:none">Sign out</button>
+          <div class="profile" style="margin-left: 8px;">
+            <div class="avatar" id="avatar">U</div>
+            <button class="icon-btn" id="profileBtn" aria-label="Open profile"><i data-lucide="chevron-down"></i></button>
+            <div class="menu" id="profileMenu">
+              <div class="group">
+                <label>Theme</label>
+                <select id="themeSelect">
+                  <option value="mint">Green / Mint</option>
+                  <option value="blue">Baby Blue</option>
+                  <option value="pink">Faded Pink</option>
+                  <option value="dark">Dark Mode</option>
+                </select>
+              </div>
+              <div class="group">
+                <button id="settingsBtn"><i data-lucide="settings"></i> Settings</button>
+                <button id="exportBtn"><i data-lucide="download"></i> Export .json</button>
+                <button id="importBtn"><i data-lucide="upload"></i> Import .json</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pages -->
+      <section class="page active" id="homePage">
+        <div class="grid" style="grid-template-columns: 1fr;">
+          <div class="card">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; gap:10px; flex-wrap:wrap;">
+              <h2 style="margin:0">Overview</h2>
+              <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button class="btn secondary" id="todayBtn"><i data-lucide="calendar-days"></i> Today</button>
+                <button class="btn secondary" id="prevWeek">‹</button>
+                <button class="btn secondary" id="nextWeek">›</button>
+              </div>
+            </div>
+            <div class="scroll-x">
+              <div class="timetable" id="weeklyViewHome" aria-label="Weekly timetable (read-only)"></div>
+              <div class="month-grid" id="monthlyViewHome" style="display:none"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="page" id="calendarPage">
+        <div class="grid" style="grid-template-columns: 1fr;">
+          <div class="card">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; gap:10px; flex-wrap:wrap;">
+              <h2 style="margin:0">Calendar</h2>
+              <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                <span id="monthLabel" style="font-weight:700"></span>
+                <button class="btn secondary" id="prevMonth">‹</button>
+                <button class="btn secondary" id="nextMonth">›</button>
+              </div>
+            </div>
+            <div class="scroll-x">
+              <div class="timetable" id="weeklyViewCal" aria-label="Weekly timetable (editable)"></div>
+              <div class="month-grid" id="monthlyView"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="page" id="askPage">
+        <div class="grid" style="grid-template-columns: 1fr;">
+          <div class="card ai-box">
+            <h2 style="margin:0">Ask AI</h2>
+            <textarea id="aiInput" placeholder="Examples: \n• add lesson math on 2025-09-20 15:00-16:00 color #6ee7b7 recurring \n• can I hang out next Friday evening? \n• find time to hang out on 2025-09-22 for 2 hours (override)"></textarea>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button class="btn" id="askBtn"><i data-lucide="sparkles"></i> Ask</button>
+            </div>
+            <div id="aiResponse" class="card" style="padding:12px; display:none"></div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <!-- Modal: Add/Edit Event -->
+  <div class="modal-backdrop" id="modalBackdrop" aria-hidden="true">
+    <div class="modal">
+      <h3>Add / Edit Lesson</h3>
+      <div class="row">
+        <div>
+          <label>Title</label>
+          <input id="evtTitle" placeholder="e.g., Chemistry" />
+        </div>
+        <div>
+          <label>Color</label>
+          <input id="evtColor" type="color" value="#6ee7b7" />
+        </div>
+        <div>
+          <label>Start (YYYY-MM-DD HH:MM)</label>
+          <input id="evtStart" placeholder="2025-09-20 15:00" />
+        </div>
+        <div>
+          <label>End (YYYY-MM-DD HH:MM)</label>
+          <input id="evtEnd" placeholder="2025-09-20 16:00" />
+        </div>
+        <div class="full">
+          <label>Recurring Weekly?</label>
+          <select id="evtRecurring">
+            <option value="no" selected>No</option>
+            <option value="yes">Yes</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:12px;">
+        <button class="btn ghost" id="cancelEvt">Cancel</button>
+        <button class="btn" id="saveEvt">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  // -------- Utilities --------
+  const $ = (q, el=document) => el.querySelector(q);
+  const $$ = (q, el=document) => Array.from(el.querySelectorAll(q));
+  const fmtDate = (d) => d.toISOString().split('T')[0];
+  const pad = (n) => n.toString().padStart(2, '0');
+  const toLocal = (dateStr) => new Date(dateStr.replace(' ', 'T'));
+  const sameDay = (a,b) => a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
+  const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate()+n); return x; };
+  const startOfWeek = (d) => { const x=new Date(d); const day=(x.getDay()+6)%7; x.setDate(x.getDate()-day); x.setHours(0,0,0,0); return x; }; // Monday
+  const startOfMonth = (d) => { const x=new Date(d); x.setDate(1); x.setHours(0,0,0,0); return x; };
+
+  // -------- Data Layer --------
+  const DB = { firebaseConfigured:false, user:null,
+    initFirebase(){ const firebaseConfig = { apiKey:"", authDomain:"", databaseURL:"", projectId:"", storageBucket:"", messagingSenderId:"", appId:"" };
+      try{ if(firebaseConfig.apiKey){ const app=firebase.initializeApp(firebaseConfig); this.auth=firebase.getAuth?firebase.getAuth(app):firebase.auth(); this.db=firebase.getDatabase?firebase.getDatabase(app):firebase.database(); this.firebaseConfigured=true; } }catch(e){ console.warn('Firebase init skipped', e) }
+    },
+    async signIn(email,pwd){ if(!this.firebaseConfigured){ alert('Using local mode (no Firebase config). Data saved to this browser.'); return; }
+      const { signInWithEmailAndPassword }=firebase; try{ const u=await signInWithEmailAndPassword(this.auth,email,pwd); this.user=u.user; loadEvents(); }catch(e){ alert('Sign in error: '+e.message) } },
+    async signOut(){ if(!this.firebaseConfigured) return; const { signOut }=firebase; await signOut(this.auth); this.user=null; saveLocal(); renderAll(); },
+    async save(events){ if(this.firebaseConfigured && this.user){ const path=`users/${this.user.uid}/events`; await firebase.set(firebase.ref(this.db,path), events); } else { localStorage.setItem('studyflow_events', JSON.stringify(events)); } },
+    async load(){ if(this.firebaseConfigured && this.user){ const snap=await firebase.get(firebase.ref(this.db,`users/${this.user.uid}/events`)); return snap.exists()?snap.val():[]; } return JSON.parse(localStorage.getItem('studyflow_events')||'[]'); }
+  }
+
+  // Schema: {id,title,startISO,endISO,color,recurringWeekly:boolean}
+  let EVENTS = [];
+  function saveLocal(){ DB.save(EVENTS) }
+  async function loadEvents(){ EVENTS = await DB.load(); renderAll(); }
+
+  // -------- State --------
+  let CURRENT_DATE = new Date();
+  let CURRENT_VIEW = 'weekly'; // 'weekly' or 'monthly'
+
+  // -------- Nav --------
+  function setActivePage(page){
+    $$('#nav button').forEach(b=> b.classList.toggle('active', b.dataset.nav===page));
+    $$('#homePage, #calendarPage, #askPage').forEach(p=> p.classList.remove('active'));
+    if(page==='home') $('#homePage').classList.add('active');
+    if(page==='calendar') $('#calendarPage').classList.add('active');
+    if(page==='ask') $('#askPage').classList.add('active');
+    updateViewVisibility();
+  }
+
+  // -------- View Toggle --------
+  function setView(view){ CURRENT_VIEW=view; $$('#viewToggle button').forEach(b=> b.classList.toggle('active', b.dataset.view===view)); renderAll(); updateViewVisibility(); }
+  function updateViewVisibility(){
+    // Home: read-only views
+    $('#weeklyViewHome').style.display = CURRENT_VIEW==='weekly' ? 'block' : 'none';
+    $('#monthlyViewHome').style.display = CURRENT_VIEW==='monthly' ? 'grid' : 'none';
+    // Calendar: both exist; prefer CURRENT_VIEW
+    $('#weeklyViewCal').style.display = CURRENT_VIEW==='weekly' ? 'block' : 'none';
+    $('#monthlyView').style.display = CURRENT_VIEW==='monthly' ? 'grid' : 'none';
+  }
+
+  // -------- Weekly Render (supports editable flag) --------
+  function renderWeekly(containerId, editable=false){
+    const container = document.getElementById(containerId);
+    container.innerHTML = '';
+
+    const weekStart = startOfWeek(CURRENT_DATE);
+    const days = Array.from({length:7}, (_,i)=> addDays(weekStart, i));
+    const hours = Array.from({length:14}, (_,i)=> i+7); // 07:00–20:00
+
+    const grid = document.createElement('div'); grid.className='week-grid';
+
+    // Header
+    const corner = document.createElement('div'); corner.className='col-head'; grid.appendChild(corner);
+    const today = new Date();
+    days.forEach(d=>{ const h=document.createElement('div'); h.className='col-head' + (sameDay(d,today)?' current':''); h.textContent=d.toLocaleDateString(undefined,{ weekday:'short', month:'short', day:'numeric'}); grid.appendChild(h); });
+
+    // Time column
+    const timeCol = document.createElement('div'); timeCol.className='time-col';
+    hours.forEach(h=>{ const c=document.createElement('div'); c.className='slot'; c.textContent=`${pad(h)}:00`; c.style.display='grid'; c.style.placeItems='center'; c.style.fontWeight='700'; c.style.color='var(--muted)'; timeCol.appendChild(c); });
+    grid.appendChild(timeCol);
+
+    // Day columns
+    days.forEach(day=>{
+      const col = document.createElement('div'); col.className='day-col';
+      hours.forEach(h=>{ const cell=document.createElement('div'); cell.className='slot' + (editable?' addable':'');
+        if(editable){ cell.addEventListener('click', ()=> { const d=new Date(day); d.setHours(h,0,0,0); openModalFor(d); }); }
+        col.appendChild(cell); });
+
+      // Events
+      const dayEvents = EVENTS.filter(e=>{ const s=toLocal(e.startISO); return sameDay(s, day) || (e.recurringWeekly && s.getDay()===day.getDay()); });
+      dayEvents.forEach(evt=>{
+        const s=toLocal(evt.startISO), e=toLocal(evt.endISO);
+        const startIndex = Math.max(0, s.getHours()-7); const blocks = Math.max(1, Math.ceil((e-s)/(60*60*1000)));
+        const target = col.children[startIndex]; if(!target) return;
+        const chip = document.createElement('div'); chip.className='event-chip'; chip.style.background = evt.color || 'var(--chip-bg)';
+        chip.innerHTML = `<div><div>${evt.title}</div><div class="meta">${pad(s.getHours())}:${pad(s.getMinutes())}–${pad(e.getHours())}:${pad(e.getMinutes())}</div></div>`;
+        if(editable){ const del=document.createElement('button'); del.className='icon-btn'; del.innerHTML=lucide.trash.toSvg({size:18}); del.onclick=()=> deleteEvent(evt.id); chip.appendChild(del); }
+        chip.style.height = (blocks*56 - 8) + 'px'; target.style.position='relative'; target.appendChild(chip);
+      });
+
+      grid.appendChild(col);
+    });
+
+    container.appendChild(grid);
+  }
+
+  // -------- Monthly Render (editable only in Calendar page) --------
+  function renderMonthly(containerId, editable=false){
+    const grid = document.getElementById(containerId); grid.innerHTML='';
+    const monthStart = startOfMonth(CURRENT_DATE);
+    const firstDayIdx = (monthStart.getDay()+6)%7; // Monday
+    const daysInMonth = new Date(monthStart.getFullYear(), monthStart.getMonth()+1, 0).getDate();
+    if(containerId==='monthlyView'){ $('#monthLabel').textContent = monthStart.toLocaleDateString(undefined,{ month:'long', year:'numeric'}); }
+
+    const headers = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    headers.forEach(h=>{ const head=document.createElement('div'); head.className='col-head'; head.textContent=h; grid.appendChild(head); })
+
+    for(let i=0;i<firstDayIdx;i++){ grid.appendChild(document.createElement('div')); }
+
+    for(let day=1; day<=daysInMonth; day++){
+      const cell=document.createElement('div'); cell.className='day';
+      const date=new Date(monthStart.getFullYear(), monthStart.getMonth(), day);
+      const header=document.createElement('header');
+      const addBtnHtml = editable ? `<button class="icon-btn" title="Add" aria-label="Add">${lucide.plus.toSvg({size:16})}</button>` : '';
+      header.innerHTML = `<span>${day}</span>${addBtnHtml}`;
+      if(editable){ header.querySelector('button').onclick=()=> openModalFor(date); }
+      cell.appendChild(header);
+
+      const dayEvents = EVENTS.filter(e=>{ const s=toLocal(e.startISO); return sameDay(s,date) || (e.recurringWeekly && s.getDay()===date.getDay()); });
+      dayEvents.forEach(evt=>{
+        const pill=document.createElement('div'); pill.className='pill'; pill.style.background = evt.color || 'var(--chip-bg)';
+        const s=toLocal(evt.startISO); pill.innerHTML = `${evt.title} <span class="meta">${pad(s.getHours())}:${pad(s.getMinutes())}</span>`;
+        if(editable){ const bin=document.createElement('button'); bin.className='icon-btn'; bin.innerHTML=lucide.trash.toSvg({size:16}); bin.onclick=()=> deleteEvent(evt.id); pill.appendChild(bin); }
+        cell.appendChild(pill);
+      });
+
+      grid.appendChild(cell);
+    }
+  }
+
+  // -------- CRUD --------
+  function openModalFor(date){
+    $('#evtTitle').value=''; $('#evtColor').value='#6ee7b7';
+    const dStr = `${fmtDate(date)} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    $('#evtStart').value=dStr; $('#evtEnd').value=`${fmtDate(date)} ${pad((date.getHours()+1)%24)}:${pad(date.getMinutes())}`; $('#evtRecurring').value='no';
+    $('#modalBackdrop').classList.add('open');
+  }
+  function closeModal(){ $('#modalBackdrop').classList.remove('open') }
+  function saveEventFromModal(){
+    const title=$('#evtTitle').value.trim(); const color=$('#evtColor').value||'#6ee7b7';
+    const startISO=$('#evtStart').value.trim(); const endISO=$('#evtEnd').value.trim(); const recurringWeekly=$('#evtRecurring').value==='yes';
+    if(!title||!startISO||!endISO){ alert('Please fill all fields'); return; }
+    EVENTS.push({ id:crypto.randomUUID(), title, color, startISO, endISO, recurringWeekly });
+    saveLocal(); closeModal(); renderAll();
+  }
+  function deleteEvent(id){ if(!confirm('Delete this lesson?')) return; EVENTS = EVENTS.filter(e=> e.id!==id); saveLocal(); renderAll(); }
+
+  // -------- Ask AI (local rules; API key handled server-side/db) --------
+  async function askAI(){
+    const q=$('#aiInput').value.trim(); if(!q) return; const parsed=parseAICommand(q); let reply='';
+    if(parsed.type==='add'){
+      EVENTS.push({ id:crypto.randomUUID(), title:parsed.title, color:parsed.color||'#fef08a', startISO:parsed.startISO, endISO:parsed.endISO, recurringWeekly:parsed.recurring });
+      saveLocal(); renderAll(); reply=`Added: ${parsed.title} on ${parsed.startISO} → ${parsed.endISO}${parsed.recurring?' (recurring weekly)':''}.`;
+    } else if(parsed.type==='hangout'){
+      const result=findHangout(parsed);
+      if(result.ok){ reply=`You can hang out on ${result.when.start} for ${parsed.durationHours||2}h.`; }
+      else if(parsed.override){ const moved=forceHangout(parsed); reply=`Override accepted. Booked hangout on ${moved.when.start}. Rescheduled ${moved.movedCount} block(s).`; }
+      else { reply=`Not ideal: ${result.reason}. Add "override" to force and auto-reschedule.`; }
+    } else { reply='I can add lessons ("add lesson math on 2025-09-20 15:00-16:00 color #6ee7b7 recurring") or find hangout times ("can I hang out next Friday evening?").'; }
+    const box=$('#aiResponse'); box.style.display='block'; box.textContent=reply;
+  }
+
+  function parseAICommand(text){
+    const t=text.toLowerCase();
+    if(/add\s+(lesson|study|event)/.test(t)){
+      const date=(text.match(/\d{4}-\d{2}-\d{2}/)||[])[0];
+      const times=text.match(/(\d{1,2}:\d{2})\s*[-to]+\s*(\d{1,2}:\d{2})/i);
+      const color=(text.match(/#([0-9a-f]{3,6})/i)||[])[0];
+      const recurring=/recurring|repeat weekly/.test(t);
+      const titleMatch=text.match(/add\s+(?:lesson|study|event)\s+([^\d\n]+?)\s+on/i);
+      const title=titleMatch?titleMatch[1].trim().replace(/\s+$/,''):'Lesson';
+      const startISO=`${date} ${times?times[1]:'15:00'}`; const endISO=`${date} ${times?times[2]:'16:00'}`;
+      return { type:'add', title, startISO, endISO, color, recurring };
+    }
+    if(/hang\s*out/.test(t)){
+      const dur=parseInt((text.match(/(\d+)\s*h/)||[])[1]||'2',10); const override=/override|force/.test(t);
+      let targetDate=null; const date=(text.match(/\d{4}-\d{2}-\d{2}/)||[])[0];
+      if(date){ targetDate=new Date(date+'T12:00:00'); } else {
+        const days=['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
+        for(let i=0;i<7;i++) if(t.includes(days[i])){ targetDate=nextDayOfWeek(new Date(), i); break; }
+      }
+      return{ type:'hangout', durationHours:dur, override, targetDate };
+    }
+    return { type:'unknown' };
+  }
+
+  function nextDayOfWeek(d, dow){ const day=(d.getDay()+6)%7; const diff=(dow-day+7)%7 || 7; return addDays(d, diff); }
+  function busyIntervalsOn(date){ return EVENTS.filter(e=>{ const s=toLocal(e.startISO); return sameDay(s,date) || (e.recurringWeekly && s.getDay()===date.getDay()); }).map(e=>({ start:toLocal(e.startISO), end:toLocal(e.endISO), id:e.id })).sort((a,b)=> a.start-b.start); }
+  function findHangout({ durationHours=2, targetDate=null }){ const startDate=targetDate||new Date(); for(let offset=0; offset<21; offset++){ const day=addDays(startDate, offset); const intervals=busyIntervalsOn(day); let pointer=new Date(day); pointer.setHours(17,0,0,0); const endLimit=new Date(day); endLimit.setHours(22,0,0,0); for(const b of intervals){ if(pointer<b.end && pointer>=b.start){ pointer=new Date(b.end); } } const candidateEnd=new Date(pointer.getTime()+durationHours*60*60*1000); if(candidateEnd<=endLimit) return { ok:true, when:{ start:`${fmtDate(pointer)} ${pad(pointer.getHours())}:${pad(pointer.getMinutes())}` } }; } return { ok:false, reason:'No free evening slot found in the next 3 weeks.' }; }
+  function forceHangout({ durationHours=2, targetDate=null }){ const day=targetDate||new Date(); const start=new Date(day); start.setHours(19,0,0,0); const end=new Date(start.getTime()+durationHours*60*60*1000); let movedCount=0; const conflicts=EVENTS.filter(e=> sameDay(toLocal(e.startISO), start) && !(toLocal(e.endISO)<=start || toLocal(e.startISO)>=end)); conflicts.forEach(e=>{ const s=toLocal(e.startISO), ee=toLocal(e.endISO); const ns=addDays(s,1), ne=addDays(ee,1); e.startISO=`${fmtDate(ns)} ${pad(ns.getHours())}:${pad(ns.getMinutes())}`; e.endISO=`${fmtDate(ne)} ${pad(ne.getHours())}:${pad(ne.getMinutes())}`; movedCount++; }); EVENTS.push({ id:crypto.randomUUID(), title:'Hangout', color:'#c7d2fe', startISO:`${fmtDate(start)} ${pad(start.getHours())}:${pad(start.getMinutes())}`, endISO:`${fmtDate(end)} ${pad(end.getHours())}:${pad(end.getMinutes())}`, recurringWeekly:false }); saveLocal(); renderAll(); return { when:{ start:`${fmtDate(start)} ${pad(start.getHours())}:${pad(start.getMinutes())}` }, movedCount } }
+
+  // -------- Render All --------
+  function renderAll(){
+    // Weekly
+    renderWeekly('weeklyViewHome', false);
+    renderWeekly('weeklyViewCal', true);
+    // Monthly
+    renderMonthly('monthlyViewHome', false);
+    renderMonthly('monthlyView', true);
+  }
+
+  // -------- Theme --------
+  function setTheme(v){ document.documentElement.setAttribute('data-theme', v); localStorage.setItem('studyflow_theme', v); }
+
+  // -------- Boot --------
+  function boot(){
+    lucide.createIcons(); DB.initFirebase(); loadEvents();
+
+    // Sidebar toggle (desktop + mobile)
+    $('#toggleSidebar').onclick = ()=>{
+      if(window.innerWidth < 960){ $('#sidebar').classList.toggle('open'); }
+      else { document.body.classList.toggle('sidebar-collapsed'); }
+    };
+    // Close drawer tap-out on mobile
+    document.addEventListener('click', (e)=>{ if(window.innerWidth<960){ if(!$('#sidebar').contains(e.target) && !$('#toggleSidebar').contains(e.target)){ $('#sidebar').classList.remove('open'); } } });
+
+    // Navigation
+    $$('#nav button').forEach(b=> b.onclick = ()=> setActivePage(b.dataset.nav));
+
+    // View toggle
+    $$('#viewToggle button').forEach(b=> b.onclick = ()=> setView(b.dataset.view));
+
+    // Profile menu + theme
+    $('#profileBtn').onclick = ()=> $('#profileMenu').classList.toggle('open');
+    $('#themeSelect').onchange = (e)=> setTheme(e.target.value);
+    setTheme(localStorage.getItem('studyflow_theme')||'mint');
+
+    // Pagination
+    $('#prevWeek').onclick = ()=> { CURRENT_DATE = addDays(CURRENT_DATE, -7); renderAll(); };
+    $('#nextWeek').onclick = ()=> { CURRENT_DATE = addDays(CURRENT_DATE, 7); renderAll(); };
+    $('#todayBtn').onclick   = ()=> { CURRENT_DATE = new Date(); renderAll(); };
+    $('#prevMonth').onclick = ()=> { CURRENT_DATE.setMonth(CURRENT_DATE.getMonth()-1); renderAll(); };
+    $('#nextMonth').onclick = ()=> { CURRENT_DATE.setMonth(CURRENT_DATE.getMonth()+1); renderAll(); };
+
+    // Modal
+    $('#cancelEvt').onclick = closeModal; $('#saveEvt').onclick = saveEventFromModal;
+
+    // Ask AI
+    $('#askBtn').onclick = askAI;
+
+    // Initial visibility
+    updateViewVisibility();
+  }
+
+  document.addEventListener('DOMContentLoaded', boot);
+  </script>
+</body>
+</html>

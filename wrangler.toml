@@ -1,0 +1,11 @@
+name = "studyflow-ai-proxy"
+main = "server/worker.js"
+compatibility_date = "2025-09-18"
+
+[build]
+command = "echo 'no build'"
+
+[vars]
+# DO NOT PUT SECRET KEYS HERE. Use Cloudflare Secrets / Pages Environment variables instead.
+# Example variable names you should set in Cloudflare:
+# OPENROUTER_API_KEY, OPENAI_API_KEY, AI_PROVIDER, MODEL, AI_FAST_FALLBACK_MS
